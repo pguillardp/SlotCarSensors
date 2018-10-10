@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>com.racer40</groupId>
+		<artifactId>sensor-master</artifactId>
+		<version>4.0.0-SNAPSHOT</version>
+		<relativePath>sensor-master/pom.xml</relativePath>
+	</parent>
+	
+	<artifactId>sensor-tester</artifactId>
+	<name>GUI rms sensor tester</name>
+
+	<packaging>jar</packaging>
+	<version>1.0-SNAPSHOT</version>
+
+	<properties>
+		<slf4j.version>1.6.1</slf4j.version>
+	</properties>
+
+	<build>
+		<plugins />
+	</build>
+
+
+	<dependencies>
+
+		<dependency>
+			<groupId>com.racer40</groupId>
+			<version>4.0.0-SNAPSHOT</version>
+			<artifactId>sensor-common</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>com.racer40</groupId>
+			<version>4.0.0-SNAPSHOT</version>
+			<artifactId>sensor-legacy</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>com.racer40</groupId>
+			<version>4.0.0-SNAPSHOT</version>
+			<artifactId>sensor-arduino</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>com.racer40</groupId>
+			<version>4.0.0-SNAPSHOT</version>
+			<artifactId>sensor-com.racer40.sensor.phidget</artifactId>
+		</dependency>
+
+
+
+		<!-- Apache Commons -->
+
+
+
+
+	</dependencies>
+
+</project>
