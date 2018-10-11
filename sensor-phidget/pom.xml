@@ -10,7 +10,7 @@
 		<relativePath>sensor-master/pom.xml</relativePath>
 	</parent>
 	
-	<artifactId>sensor-com.racer40.sensor.phidget</artifactId>
+	<artifactId>sensor-phidget</artifactId>
 
 	<build>
 		<plugins>
