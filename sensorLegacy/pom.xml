@@ -1,14 +1,15 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
-<parent>
+	<parent>
 		<groupId>com.racer40</groupId>
 		<artifactId>sensorMaster</artifactId>
 		<version>4.0.0-SNAPSHOT</version>
 	</parent>
-	
+
 	<artifactId>legacy</artifactId>
 
 	<build>
@@ -28,13 +29,13 @@
 
 
 	<dependencies>
-	
+
 		<dependency>
 			<groupId>com.racer40</groupId>
 			<version>4.0.0-SNAPSHOT</version>
-			<artifactId>sensor-common</artifactId>
+			<artifactId>common</artifactId>
 		</dependency>
-	
+
 		<dependency>
 			<groupId>net.java.jinput</groupId>
 			<artifactId>jinput</artifactId>
@@ -42,28 +43,22 @@
 		</dependency>
 
 		<!-- https://mvnrepository.com/artifact/gnu.io/rxtx -->
-		<!-- <dependency>
-			<groupId>org.rxtx</groupId>
-			<artifactId>rxtxcomm</artifactId>
-			<version>2.2pre2</version>
-		</dependency> -->
-		
+		<!-- <dependency> <groupId>org.rxtx</groupId> <artifactId>rxtxcomm</artifactId> 
+			<version>2.2pre2</version> </dependency> -->
+
 		<!-- https://mvnrepository.com/artifact/gnu.io/rxtx -->
-		<!-- <dependency>
-    		<groupId>gnu.io</groupId>
-    		<artifactId>rxtx</artifactId>
-    		<version>2.1.7</version>
-		</dependency> -->
-		
+		<!-- <dependency> <groupId>gnu.io</groupId> <artifactId>rxtx</artifactId> 
+			<version>2.1.7</version> </dependency> -->
+
 		<!-- https://mvnrepository.com/artifact/org.rxtx/rxtx -->
 		<dependency>
-    		<groupId>org.rxtx</groupId>
-    		<artifactId>rxtx</artifactId>
-    		<version>2.1.7</version>
+			<groupId>org.rxtx</groupId>
+			<artifactId>rxtx</artifactId>
+			<version>2.1.7</version>
 		</dependency>
-		
-		
-		
+
+
+
 
 	</dependencies>
 </project>
