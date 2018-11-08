@@ -7,7 +7,7 @@
 <?import java.lang.*?>
 <?import javafx.scene.layout.*?>
 
-<AnchorPane fx:id="main" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="689.0" prefWidth="1215.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.racer40.sensor.tester.TesterController">
+<AnchorPane fx:id="main" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="689.0" prefWidth="1215.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.racer40.sensortester.TesterController">
    <children>
       <ImageView fx:id="viewSensorPinout" fitHeight="450.0" fitWidth="568.0" layoutX="237.0" layoutY="170.0" smooth="false" />
       <Button layoutX="762.0" layoutY="638.0" mnemonicParsing="false" onAction="#onClearLogs" text="Clear logs" />
