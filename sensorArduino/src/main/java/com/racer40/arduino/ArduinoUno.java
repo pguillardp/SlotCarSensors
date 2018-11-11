@@ -1,10 +1,8 @@
 package com.racer40.arduino;
 
-import java.io.IOException;
-import java.nio.file.LinkOption;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,31 +11,55 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fazecast.jSerialComm.SerialPort;
+import com.fazecast.jSerialComm.SerialPortDataListener;
+import com.fazecast.jSerialComm.SerialPortEvent;
+import com.racer40.sensor.DateTimeHelper;
 import com.racer40.sensor.Rs232;
 import com.racer40.sensor.SensorConstants;
 import com.racer40.sensor.SensorPinImpl;
+import com.racer40.sensor.SystemUtils;
 
+/*
+ * rs232 protocol(uno and mega):<br> 
+ * Setup: 57600, parity none, databits 8, stop bit 1, no handshake ("57600,n,8,1") <br>
+ * - PC -> Arduino:<br>
+ *  . change output: S(et),<pin number as described above>,<value: 0x00 means low state, not 0x00 means high state, range 0x00 to 0xFF> <br>
+ *  Ex (uno): 0x53 0x2C 0x0B 0x2C 0x0F -> 0x53 is 'S'et, 0x2C is comma separator, 0x0B stands for PD5, 0x0F is not 0x00 so pin state is set to hight <br>
+ *  . reset date counter: R(eset) Ex: 0x52: where 0x52 is 'R'eset. The 4 bytes unsigned long counter are set to 0x00000000<br>
+ *   . get pin status: G(et),<pin number, input or output> <br>
+ *   Ex (uno): 0x47 0x2C 0x06: where 0x47 is 'G'et, 0x06 stands for PD4<br>
+ *    . Arduino response: P(in),<pin number, as described above>,<date: internal 4 byte unsigned long counter>,<value: 0x00 for low state, 0xFF for hight state><br>
+ *     Ex: (uno): 0x50 0x2C 0x06 0x2C 0x52362154 0x2C 0xFF means: pin 6 (PD4) is in high state (0xFF is not 0x00) at 1379279188 half of ms (or closest half ms tick) <br>
+ *     . get date: D(ate) Ex : 0x44 Response: D,<date: internal 4 byte unsigned long counter> <br>
+ * Ex: 0x44 0x2C 0x52362154<br>
+ * - Arduino -> PC: <br>
+ * . when an input change, then the arduino sends a change message to the PC: <br>
+ * C(hange),<pin number, as described above>,<date: internal 4 byte unsigned long counter>,<value: 0x00 for low state, 0xFF for hight state> <br>
+ * Ex: (uno): 0x43 0x2C 0x0D 0x2C 0x52362154 0x2C 0x00 means: pin 13 changed to low state at 1379279188 half of ms 
+ * 
+ * 
+ */
 // http://stackoverflow.com/questions/4436733/how-to-write-java-code-that-return-a-line-of-string-into-a-string-variable-from
 public class ArduinoUno extends Rs232 {
 	static final Logger logger = LoggerFactory.getLogger(ArduinoUno.class);
 
 	public static final String UNO = "Uno";
 
-	private String avrdudeFolder;
-	private String avrdude;
-	private String avrconf;
-	private String hex;
+	protected Map<String, Integer> waitget = new HashMap<>();
 
-	protected Map<String, String> input = new HashMap<>();
-	protected Map<String, String> output = new HashMap<>();
+	boolean readPort = false;
 
-	private List<String> stack = new ArrayList<>();
-	private String received = "";
+	protected final static int[] UNO_OUT_PINS = new int[] { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 };
+	public final static int[] UNO_IN_PINS = new int[] { 12, 13, 14, 15, 16, 17, 18, 19 };
 
-	private byte[] buffer = new byte[1024];
+	private final Thread mainThread;
+	private SerialPort comPort = null;
+	private String comPortName = "";
 
-	private String version = "";
-	private long top;
+	private byte rxBuffer[] = new byte[128];
+	private int rxPos;
+
+	public boolean isProgramming = false;
 
 	public ArduinoUno() {
 		super();
@@ -51,191 +73,365 @@ public class ArduinoUno extends Rs232 {
 		this.ioPinList();
 
 		this.poll = 1500;
-		this.bauds = 19200;
+		this.bauds = 57600;
 		databit = 8;
 		stopbit = SerialPort.ONE_STOP_BIT;
 		parity = SerialPort.NO_PARITY;
+
+		mainThread = new Thread(new MainRunnable());
 	}
 
-	public synchronized void sendToArduino(String data) {
-		synchronized (this.stack) {
-			this.stack.add(data);
+	protected boolean isArduinoUno() {
+		return this instanceof ArduinoUno;
+	}
+
+	protected boolean isArduinoMega() {
+		return this instanceof ArduinoMega;
+	}
+
+	public void setPortName(String portName) {
+		// String systemPortName = getSystemPortName(portName);
+		//
+		// if (comPortName.equals(systemPortName)) {
+		// return;
+		// }
+
+		closePort();
+
+		comPortName = portName;
+		if (!"".equals(portName)) {
+			SerialPort ports[] = SerialPort.getCommPorts();
+			for (SerialPort port : ports) {
+				if (port.getSystemPortName().equals(comPortName)) {
+					comPort = port;
+					comPort.addDataListener(new RxHandler());
+					openPort();
+					break;
+				}
+			}
+		}
+	}
+
+	private class RxHandler implements SerialPortDataListener {
+
+		@Override
+		public int getListeningEvents() {
+			return SerialPort.LISTENING_EVENT_DATA_RECEIVED;
+		}
+
+		@Override
+		public void serialEvent(SerialPortEvent event) {
+			byte[] data = event.getReceivedData();
+			for (int i = 0; i < data.length; ++i) {
+				rxBuffer[rxPos] = data[i];
+				if ((char) rxBuffer[0] != 'P' && (char) rxBuffer[0] != 'C' && (char) rxBuffer[0] != 'D') {
+					rxPos = 0;
+				} else {
+					rxPos++;
+				}
+
+				switch ((char) rxBuffer[0]) {
+				case 'C':
+					if (rxPos == 10) {
+						rxPos = 0;
+						String pinIdentifier = "digital.in." + ((int) rxBuffer[2]);
+						SensorPinImpl pin = getPin(pinIdentifier);
+						if (pin != null) {
+							long l = 0;
+							l |= rxBuffer[4] & 0xFF;
+							l <<= 8;
+							l |= rxBuffer[5] & 0xFF;
+							l <<= 8;
+							l |= rxBuffer[6] & 0xFF;
+							l <<= 8;
+							l |= rxBuffer[7] & 0xFF;
+							pin.setPinValueForNotification(
+									(rxBuffer[2] != 0) ? SensorConstants.PIN_ON : SensorConstants.PIN_OFF, l, false,
+									true);
+						}
+					}
+					break;
+				case 'P':
+					if (rxPos == 10) {
+						rxPos = 0;
+						synchronized (waitget) {
+							String pin = "" + (int) rxBuffer[2];
+							waitget.put(pin, ((int) rxBuffer[9]));
+						}
+					}
+					break;
+				case 'D':
+					if (rxPos == 6) {
+						rxPos = 0;
+					}
+					break;
+				}
+			}
 		}
 	}
 
 	@Override
-	public void run() {
-
-		// check for errors + init dialog with unit
-		try {
-			if (this.in.available() > 0) {
-				logger.debug("data available: {}", this.in.available());
-				int len = 0, data;
-				while ((data = in.read()) > -1) {
-					if (data == '\n') {
-						break;
-					}
-					buffer[len++] = (byte) data;
-				}
-				String buffer_string = new String(buffer, 0, len);
-				buffer_string = buffer_string.replace("\r", "");
-				this.parseBuffer(buffer_string);
-
-			}
-		} catch (IOException e) {
-			logger.error("{}", e);
-		}
-
-		// push next command to serial
-		synchronized (this.stack) {
-			if (this.stack.size() > 0) {
-				try {
-					String data = this.stack.get(0);
-					this.out.write(data.getBytes());
-					this.out.flush();
-					this.out.write(" ".getBytes());
-					this.out.flush();
-				} catch (IOException e) {
-					logger.error("{}", e);
-				}
-				this.stack.remove(0);
-			}
-		}
+	public boolean setOutputPinValue(String pinIdentifier, int value) {
+		String[] s = pinIdentifier.split("\\.");
+		String pin = s[2].length() == 1 ? "0" + s[2] : s[2];
+		this.sendToArduino("s," + pin + "," + (value != 0 ? 1 : 0));
+		return true;
 	}
 
-	protected synchronized void parseBuffer(String buffer) {
-		logger.debug("buffer: " + buffer);
-		received = buffer;
-		logger.debug("received: " + received);
-		if (received.contains("OK") || received.length() == 0) {
+	@Override
+	public int getPinValue(String pinIdentifier) {
+		String[] s = pinIdentifier.split("\\.");
+		String pin = s[2].length() == 1 ? "0" + s[2] : s[2];
+		long endwait = DateTimeHelper.getSystemTime() + 100;
+		waitget.put(pin, -1);
+		this.sendToArduino("g," + pin);
+		while (DateTimeHelper.getSystemTime() < endwait) {
+			synchronized (this.waitget) {
+				if (this.waitget.get(pin) != -1) {
+					return this.waitget.get(pin);
+				}
+			}
+		}
+		return -1;
+	}
+
+	/*
+	 * send command to arduino
+	 */
+	public void sendToArduino(String command) {
+		if (command.length() < 1) {
+			this.eventLogger.set(null);
+			this.eventLogger.set("Empty command");
 			return;
 		}
 
-		// logger.debug("elapsed: {}", DateTimeHelper.getSystemTime() - top);
+		int pin;
+		int value;
 
-		switch (received.charAt(0)) {
+		try {
+			byte bytes[] = null;
 
-		// IO change
-		case 'C':
-			String data[] = received.split(",");
-			String pinIdentifier = data[0].substring(1, data[0].length() - 1);
-			String val = data[0].substring(data[0].length() - 1, data[0].length());
-			if (output.containsKey(pinIdentifier)) {
-				output.put(pinIdentifier, val + "," + data[1]);
+			switch (command.charAt(0)) {
+			case 'S':
+			case 's':
+				if (command.length() != 6 || command.charAt(1) != ',' || command.charAt(4) != ',') {
+					this.eventLogger.set(null);
+					this.eventLogger.set("Wrong command. Correct format: S,00,0");
+					return;
+				}
+
+				try {
+					pin = Integer.parseInt(command.substring(2, 4));
+				} catch (Exception ex) {
+					pin = -1;
+				}
+
+				if ((isArduinoMega() && !contains(ArduinoMega.MEGA_OUT_PINS, pin)
+						|| isArduinoUno() && !contains(ArduinoUno.UNO_OUT_PINS, pin))) {
+					this.eventLogger.set(null);
+					this.eventLogger.set("Wrong output pin number: " + String.valueOf(pin));
+					return;
+				}
+
+				try {
+					value = Integer.parseInt(command.substring(5, 6));
+				} catch (Exception ex) {
+					value = -1;
+				}
+
+				bytes = new byte[5];
+				bytes[0] = (byte) 'S';
+				bytes[1] = (byte) ',';
+				bytes[2] = (byte) pin;
+				bytes[3] = (byte) ',';
+				bytes[4] = (byte) value;
+
+				break;
+			case 'r':
+			case 'R':
+				bytes = new byte[1];
+				bytes[0] = (byte) 'R';
+				break;
+			case 'g':
+			case 'G':
+				if (command.length() != 4 || command.charAt(1) != ',') {
+					this.eventLogger.set(null);
+					this.eventLogger.set("Wrong command. Correct format: G,00");
+					return;
+				}
+
+				try {
+					pin = Integer.parseInt(command.substring(2, 4));
+				} catch (Exception ex) {
+					pin = -1;
+				}
+
+				if ((isArduinoMega() && !contains(ArduinoMega.MEGA_OUT_PINS, pin)
+						&& !contains(ArduinoMega.MEGA_IN_PINS, pin))
+						|| (isArduinoUno() && !contains(UNO_OUT_PINS, pin) && !contains(UNO_IN_PINS, pin))) {
+					this.eventLogger.set(null);
+					this.eventLogger.set("Wrong output pin number: " + String.valueOf(pin));
+					return;
+				}
+
+				bytes = new byte[3];
+				bytes[0] = (byte) 'G';
+				bytes[1] = (byte) ',';
+				bytes[2] = (byte) pin;
+
+				break;
+			case 'd':
+			case 'D':
+				bytes = new byte[1];
+				bytes[0] = (byte) 'D';
+				break;
+			default:
+				this.eventLogger.set(null);
+				this.eventLogger.set("Wrong command");
+				return;
 			}
-			if (input.containsKey(pinIdentifier)) {
-				String prev[] = input.get(pinIdentifier).split(",");
 
-				// input change => trigger event
-				if (prev.length == 0 || !val.equals(prev[0])) {
+			this.eventLogger.set(null);
+			this.eventLogger.set("Hex command:     " + bytesToHex(bytes));
 
-					// date offset
-					long lDate = Long.parseLong(data[1]);
-
-					this.getPin(pinIdentifier).setPinValueForNotification(
-							"1".equals(val) ? SensorConstants.PIN_ON : SensorConstants.PIN_OFF, lDate, true, true);
-
-					this.eventLogger.set(String.format("Pin change: %s at %d ticks", val, lDate));
-
-				}
-				input.put(pinIdentifier, val + "," + data[1]);
+			if (comPort == null) {
+				this.eventLogger.set(null);
+				this.eventLogger.set("No COM port selected");
+				return;
 			}
-			break;
 
-		// version
-		case 'V':
-			this.version = received;
-			break;
+			comPort.writeBytes(bytes, bytes.length);
 
-		// mode change
-		case 'I':
-			pinIdentifier = received.substring(1, received.length() - 1);
-			if (received.endsWith("I")) {
-				if (output.containsKey(pinIdentifier)) {
-					output.remove(pinIdentifier);
+		} catch (Exception ex) {
+			this.eventLogger.set(null);
+			this.eventLogger.set("Failed to send command [" + command + "]");
+		}
+	}
+
+	private boolean contains(int[] data, final int key) {
+		return Arrays.stream(data).anyMatch(i -> i == key);
+	}
+
+	private String bytesToHex(byte[] bytes) {
+		String result = "";
+
+		for (int i = 0; i < bytes.length; i++) {
+			result += String.format("%02X ", bytes[i]);
+			result += " ";
+		}
+
+		return result.trim();
+	}
+
+	public void uploadSketch() {
+		if (comPort == null || "".equals(comPort)) {
+			this.eventLogger.set(null);
+			this.eventLogger.set("COM Port not selected");
+			return;
+		}
+
+		if (isProgramming) {
+			this.eventLogger.set(null);
+			this.eventLogger.set("isProgramming in progress");
+			return;
+		}
+
+		Thread thread;
+		thread = new Thread() {
+			@Override
+			public void run() {
+				isProgramming = true;
+				try {
+					closePort();
+
+					String toolsFolder = SystemUtils.getToolsFolder();
+
+					String AVRDudePath = toolsFolder + "avrdude.exe";
+					String confPath = toolsFolder + "avrdude.conf";
+					String workingDir = toolsFolder;
+					String port = comPortName;
+					String hexPath = "";
+					String command = "";
+
+					if (isArduinoMega()) {
+						hexPath = toolsFolder + ("Mega.hex");
+						command = AVRDudePath + " -C" + confPath + " -V -D -p ATmega2560 -c wiring -P " + port
+								+ " -b 115200 -D -U flash:w:" + hexPath + ":i";
+					} else if (isArduinoUno()) {
+						hexPath = toolsFolder + ("Uno.hex");
+						command = AVRDudePath + " -C" + confPath + " -V -D -p ATmega328p -c arduino -P " + port
+								+ " -b 115200 -D -U flash:w:" + hexPath + ":i";
+					}
+					eventLogger.set(null);
+					eventLogger.set("HEX write command: " + command);
+					Runtime rt = Runtime.getRuntime();
+					Process proc;
+					proc = rt.exec(command, null, new File(workingDir));
+					int exitVal = proc.waitFor();
+					logger.debug("Process exitValue: {}", exitVal);
+					eventLogger.set(null);
+					eventLogger.set("HEX write result: " + (exitVal == 0 ? "OK" : "ERROR " + String.valueOf(exitVal)));
+					openPort();
+					isProgramming = false;
+
+				} catch (Exception ex) {
+					eventLogger.set(null);
+					eventLogger.set("HEX write error: " + ex.getMessage());
+					logger.error("{}", ex);
 				}
-				if (!input.containsKey(pinIdentifier)) {
-					input.put(pinIdentifier, "");
-				}
-			} else {
-				if (!output.containsKey(pinIdentifier)) {
-					output.put(pinIdentifier, "");
-				}
-				if (input.containsKey(pinIdentifier)) {
-					input.remove(pinIdentifier);
-				}
+				isProgramming = false;
 			}
-			break;
+		};
 
-		default:
-			break;
+		thread.start();
+	}
+
+	private void openPort() {
+		comPort.setComPortParameters(this.bauds, this.databit, this.stopbit, this.parity);
+		if (!comPort.openPort()) {
+			closePort();
+		}
+		rxPos = 0;
+	}
+
+	private void closePort() {
+		if (comPort == null) {
+			return;
+		}
+		this.readPort = false;
+		comPort.closePort();
+	}
+
+	private class MainRunnable implements Runnable {
+
+		@Override
+		public void run() {
+			readPort = true;
+			while (readPort) {
+				if ("".equals(comPortName) || comPort == null) {
+					continue;
+				}
+				try {
+					this.wait(10);
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				if (!comPort.isOpen()) {
+					comPort.openPort();
+					continue;
+				}
+
+			}
 		}
 	}
 
 	@Override
 	public boolean start() {
-		boolean b = super.start();
-		this.initIO();
-		return b;
+		setPortName(this.port);
+		mainThread.start();
+		return true;
 	}
-
-	/*
-	 * init board IOs
-	 */
-	private void initIO() {
-		for (int i = 2; i <= 19; i++) {
-			// this.sendToArduino("I" + i);
-		}
-	}
-
-	/*
-	 * check board is configured
-	 */
-	public boolean isConfigured() {
-		sendToArduino("V");
-		if (this.version.startsWith("V")) {
-			return true;
-		}
-		return false;
-	}
-
-	public String getVersion() {
-		this.sendToArduino("V");
-		return this.version;
-	}
-
-	/*
-	 * returns pin list and update input & output pin maps
-	 */
-	// @Override
-	// public List<SensorPin> getPinList(SensorSetup sensorSetup) {
-	// try {
-	// String name;
-	// if (input.size() + output.size() < 18) {
-	// for (int i = 2; i <= 19; i++) {
-	// this.sendToArduino("I" + i);
-	// }
-	// }
-	// for (int i = 2; i <= 19; i++) {
-	// String pin = "" + i;
-	// if (i >= 14 && i <= 19) {
-	// name = "-A" + (i - 14);
-	// } else {
-	// name = "";
-	// }
-	// if (input.containsKey(pin)) {
-	// pins.add(0, new SensorPin(i + "", i + " " + name, IN));
-	// } else {
-	// pins.add(0, new SensorPin(i + "", i + " " + name, OUT));
-	// }
-	// }
-	//
-	// } catch (Exception e) {
-	// logger.error("{}", e);
-	// ;
-	// }
-	// return super.getPinList(sensorSetup);
-	// }
 
 	/*
 	 * returns the port list where arduino uno or mega is configured
@@ -256,86 +452,70 @@ public class ArduinoUno extends Rs232 {
 		return comms;
 	}
 
-	/*
-	 * upload arduino uno .hex
-	 */
-	public void uploadHex(String port) throws IOException, InterruptedException {
-		Path avrpath = Paths.get("media\\avrdude");
-
-		Path realavrpath = avrpath.toRealPath(LinkOption.NOFOLLOW_LINKS);
-		avrdudeFolder = realavrpath.toString();
-
-		avrdudeFolder = avrdudeFolder.replace("\\", "\\\\");
-		avrdude = avrdudeFolder + "\\\\avrdude.exe";
-		avrconf = avrdudeFolder + "\\\\avrdude.conf";
-		hex = avrdudeFolder + "\\\\serialStrUno.ino.hex";
-		runCommand(new String[] { avrdude, "-C" + avrconf, "-v", "-v", "-v", "-v", "-patmega328p", "-carduino",
-				"-P" + port, "-b115200", "-D", "-Uflash:w:" + hex + ":i" });
-
-	}
-
-	private void runCommand(String[] cmd) {
-		try {
-
-			Runtime.getRuntime().exec(cmd);
-
-		} catch (IOException e) {
-			logger.error("{}", e);
-		}
-	}
-
-	protected void setPinValue(String pinstr, int value) {
-		int pin = Integer.parseInt(pinstr);
-		try {
-			this.sendToArduino("S" + pin + (value > 0 ? "1" : "0"));
-		} catch (Exception e) {
-			logger.error("{}", e);
-		}
-	}
-
-	@Override
-	public int getPinValue(String pin) {
-		this.sendToArduino("G" + pin);
-		String data = "";
-		if (output.containsKey(pin)) {
-			data = output.get(pin);
-		} else if (input.containsKey(pin)) {
-			data = input.get(pin);
-		}
-		if (data.contains(",")) {
-			String val[] = data.split(",");
-			return Integer.parseInt(val[0]);
-		}
-		return -1;
-	}
-
 	@Override
 	protected void parseFrame(byte[] frame, int numRead) {
 		// TODO Auto-generated method stub
 
 	}
 
+	/**
+	 * discover all connected arduino boards
+	 */
+	@Override
+	public void discover(long timeout) {
+
+		com.fazecast.jSerialComm.SerialPort[] ports = com.fazecast.jSerialComm.SerialPort.getCommPorts();
+		this.eventLogger.set("Search for connected arduino cards (mega and uno)");
+
+		for (com.fazecast.jSerialComm.SerialPort port : ports) {
+			String portname = port.getDescriptivePortName().toLowerCase();
+			ArduinoUno sensor = null;
+			if (portname.contains("uno")) {
+				String name = portname.substring(portname.lastIndexOf("(") + 1, portname.length() - 1);
+				sensor = new ArduinoUno();
+			} else if (portname.contains("mega")) {
+				String name = portname.substring(portname.lastIndexOf("(") + 1, portname.length() - 1);
+				sensor = new ArduinoMega();
+			}
+			if (sensor != null) {
+				sensor.setPort(port.getSystemPortName());
+				sensor.comPort = port;
+				this.discoveredInterface.set(sensor);
+				this.eventLogger.set("Initialize " + portname + " on port " + sensor.getPort());
+				sensor.uploadSketch();
+			}
+		}
+	}
+
 	@Override
 	protected void ioPinList() {
 		pins.clear();
+
 		String pinName;
-		for (int i = 2; i <= 19; i++) {
-			String identifier = "" + i;
+		for (int j = 0; j < UNO_IN_PINS.length; j++) {
+			int i = UNO_IN_PINS[j];
+			String identifier = "digital.in." + i;
 			if (i >= 14 && i <= 19) {
 				pinName = "-A" + (i - 14);
 			} else {
-				pinName = "";
+				pinName = i + "";
 			}
-			SensorPinImpl p;
-			if (input.containsKey(identifier)) {
-				p = new SensorPinImpl(this, identifier, i + " " + pinName);
-				pins.add(p);
-				p.setLocationIngrid(i + 1, 10, i + 1, 20);
+			SensorPinImpl p = new SensorPinImpl(this, identifier, i + " " + pinName);
+			pins.add(p);
+			p.setBounds(50 + (j % 10) * 25, 100 + (j / 10) * 25, 20, 20);
+		}
+
+		for (int j = 0; j < UNO_OUT_PINS.length; j++) {
+			int i = UNO_OUT_PINS[j];
+			String identifier = "digital.out." + i;
+			if (i >= 14 && i <= 19) {
+				pinName = "-A" + (i - 14);
 			} else {
-				p = new SensorPinImpl(this, i + "", i + " " + pinName);
-				pins.add(p);
-				p.setLocationIngrid(i + 1, 10, i + 1, 20);
+				pinName = i + "";
 			}
+			SensorPinImpl p = new SensorPinImpl(this, identifier, i + " " + pinName);
+			pins.add(p);
+			p.setBounds(50 + (j % 10) * 25, 200 + (j / 10) * 25, 20, 20);
 		}
 	}
 }

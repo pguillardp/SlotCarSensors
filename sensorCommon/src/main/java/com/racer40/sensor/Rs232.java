@@ -59,6 +59,18 @@ public abstract class Rs232 extends SensorImpl {
 		return comList;
 	}
 
+	protected String getSystemPortName(String descriptivePortName) {
+		String portName = "";
+		SerialPort ports[] = SerialPort.getCommPorts();
+		for (SerialPort port : ports) {
+			if (port.getDescriptivePortName().equals(descriptivePortName)) {
+				portName = port.getSystemPortName();
+				break;
+			}
+		}
+		return portName;
+	}
+
 	@Override
 	public boolean start() {
 		super.start();

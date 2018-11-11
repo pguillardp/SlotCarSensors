@@ -260,7 +260,6 @@ public abstract class PhidgetIK extends SensorImpl implements EventTarget {
 								sensor = new Phidget1012();
 							} else if (phidget.getDeviceName().contains("8/8/8")) {
 								sensor = new Phidget1018();
-
 							} else if (phidget.getDeviceName().contains("0/0/8")) {
 								sensor = new Phidget1017();
 							} else if (phidget.getDeviceName().contains("0/0/4")) {

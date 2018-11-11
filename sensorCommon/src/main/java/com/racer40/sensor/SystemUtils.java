@@ -97,6 +97,10 @@ public class SystemUtils {
 		return path;
 	}
 
+	public static String getToolsFolder() {
+		return getAsoluteAppFolder() + "\\plugins\\tools\\";
+	}
+
 	public static boolean isWindows64bits() {
 		boolean is64bit = false;
 		if (System.getProperty("os.name").contains("Windows")) {

@@ -12,6 +12,11 @@ public class ArduinoMega extends ArduinoUno {
 
 	private final Logger logger = LoggerFactory.getLogger(ArduinoMega.class);
 
+	public final static int[] MEGA_OUT_PINS = new int[] { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 22, 23, 24, 25, 26,
+			27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39 };
+	public final static int[] MEGA_IN_PINS = new int[] { 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55,
+			56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69 };
+
 	public ArduinoMega() {
 		super();
 		this.type = SensorConstants.ARDUINO_MEGA;
@@ -23,7 +28,7 @@ public class ArduinoMega extends ArduinoUno {
 		this.ioPinList();
 
 		this.poll = 1500;
-		this.bauds = 19200;
+		this.bauds = 57600;
 		databit = 8;
 		stopbit = SerialPort.ONE_STOP_BIT;
 		parity = SerialPort.NO_PARITY;
@@ -32,24 +37,32 @@ public class ArduinoMega extends ArduinoUno {
 	@Override
 	protected void ioPinList() {
 		pins.clear();
+
 		String pinName;
-		for (int i = 2; i <= 19; i++) {
-			String identifier = "" + i;
+		for (int j = 0; j < MEGA_IN_PINS.length; j++) {
+			int i = MEGA_IN_PINS[j];
+			String identifier = "digital.in." + i;
 			if (i >= 14 && i <= 19) {
 				pinName = "-A" + (i - 14);
 			} else {
-				pinName = "";
+				pinName = i + "";
 			}
-			SensorPinImpl p;
-			if (input.containsKey(identifier)) {
-				p = new SensorPinImpl(this, identifier, i + " " + pinName);
-				pins.add(p);
-				p.setLocationIngrid(i + 1, 10, i + 1, 20);
+			SensorPinImpl p = new SensorPinImpl(this, identifier, i + " " + pinName);
+			pins.add(p);
+			p.setBounds(50 + (j % 10) * 30, 100 + (j / 10) * 30, 20, 20);
+		}
+
+		for (int j = 0; j < MEGA_OUT_PINS.length; j++) {
+			int i = MEGA_OUT_PINS[j];
+			String identifier = "digital.out." + i;
+			if (i >= 14 && i <= 19) {
+				pinName = "-A" + (i - 14);
 			} else {
-				p = new SensorPinImpl(this, i + "", i + " " + pinName);
-				pins.add(p);
-				p.setLocationIngrid(i + 1, 10, i + 1, 20);
+				pinName = i + "";
 			}
+			SensorPinImpl p = new SensorPinImpl(this, identifier, i + " " + pinName);
+			pins.add(p);
+			p.setBounds(50 + (j % 10) * 30, 250 + (j / 10) * 30, 20, 20);
 		}
 	}
 }
