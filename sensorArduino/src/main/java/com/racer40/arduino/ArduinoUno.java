@@ -1,10 +1,8 @@
 package com.racer40.arduino;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.slf4j.Logger;
@@ -89,17 +87,13 @@ public class ArduinoUno extends Rs232 {
 		return this instanceof ArduinoMega;
 	}
 
-	public void setPortName(String portName) {
-		// String systemPortName = getSystemPortName(portName);
-		//
-		// if (comPortName.equals(systemPortName)) {
-		// return;
-		// }
+	@Override
+	public boolean start() {
 
 		closePort();
 
-		comPortName = portName;
-		if (!"".equals(portName)) {
+		comPortName = this.port;
+		if (!"".equals(this.port)) {
 			SerialPort ports[] = SerialPort.getCommPorts();
 			for (SerialPort port : ports) {
 				if (port.getSystemPortName().equals(comPortName)) {
@@ -110,6 +104,9 @@ public class ArduinoUno extends Rs232 {
 				}
 			}
 		}
+
+		mainThread.start();
+		return true;
 	}
 
 	private class RxHandler implements SerialPortDataListener {
@@ -174,7 +171,7 @@ public class ArduinoUno extends Rs232 {
 	public boolean setOutputPinValue(String pinIdentifier, int value) {
 		String[] s = pinIdentifier.split("\\.");
 		String pin = s[2].length() == 1 ? "0" + s[2] : s[2];
-		this.sendToArduino("s," + pin + "," + (value != 0 ? 1 : 0));
+		this.sendToArduino("s," + pin + ",0" + (value != 0 ? 1 : 0));
 		return true;
 	}
 
@@ -198,7 +195,7 @@ public class ArduinoUno extends Rs232 {
 	/*
 	 * send command to arduino
 	 */
-	public void sendToArduino(String command) {
+	protected void sendToArduino(String command) {
 		if (command.length() < 1) {
 			this.eventLogger.set(null);
 			this.eventLogger.set("Empty command");
@@ -214,7 +211,7 @@ public class ArduinoUno extends Rs232 {
 			switch (command.charAt(0)) {
 			case 'S':
 			case 's':
-				if (command.length() != 6 || command.charAt(1) != ',' || command.charAt(4) != ',') {
+				if (command.length() != 7 || command.charAt(1) != ',' || command.charAt(4) != ',') {
 					this.eventLogger.set(null);
 					this.eventLogger.set("Wrong command. Correct format: S,00,0");
 					return;
@@ -234,7 +231,7 @@ public class ArduinoUno extends Rs232 {
 				}
 
 				try {
-					value = Integer.parseInt(command.substring(5, 6));
+					value = Integer.parseInt(command.substring(5, 7));
 				} catch (Exception ex) {
 					value = -1;
 				}
@@ -323,7 +320,7 @@ public class ArduinoUno extends Rs232 {
 		return result.trim();
 	}
 
-	public void uploadSketch() {
+	protected void uploadSketch() {
 		if (comPort == null || "".equals(comPort)) {
 			this.eventLogger.set(null);
 			this.eventLogger.set("COM Port not selected");
@@ -414,42 +411,13 @@ public class ArduinoUno extends Rs232 {
 				try {
 					this.wait(10);
 				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
+					logger.error("{}");
 				}
 				if (!comPort.isOpen()) {
 					comPort.openPort();
-					continue;
 				}
-
 			}
 		}
-	}
-
-	@Override
-	public boolean start() {
-		setPortName(this.port);
-		mainThread.start();
-		return true;
-	}
-
-	/*
-	 * returns the port list where arduino uno or mega is configured
-	 */
-	public static List<String> getArduinoComPort(String type) {
-		List<String> comms = new ArrayList<>();
-
-		com.fazecast.jSerialComm.SerialPort[] ports = com.fazecast.jSerialComm.SerialPort.getCommPorts();
-
-		for (com.fazecast.jSerialComm.SerialPort port : ports) {
-			String portname = port.getDescriptivePortName();
-			if (portname.contains(type)) {
-				String name = portname.substring(portname.lastIndexOf("(") + 1, portname.length() - 1);
-				comms.add(name);
-			}
-		}
-
-		return comms;
 	}
 
 	@Override
@@ -518,4 +486,5 @@ public class ArduinoUno extends Rs232 {
 			p.setBounds(50 + (j % 10) * 25, 200 + (j / 10) * 25, 20, 20);
 		}
 	}
+
 }
