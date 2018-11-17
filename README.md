@@ -1,7 +1,7 @@
 # SlotCarSensors
 This project contains code to manage miscellaneous slot car detectors for analogic (ex arduino) and digital (ex carrera control unit) circuits.
 Its added value is a sensor interface normalization to split sensing logic developmend and race management system development.
-The normalization relies on pin names, pin values, event dating and sensor wrapping (sensor detection, sensor configuration, start/stop...).
+The normalization relies on pin names, pin values, event dating and sensor usual feature wrapping (sensor detection, sensor configuration, sensor start/stop...).
 
 Modules:
 - sensorArduino, phidget, legacy: sensor source code
