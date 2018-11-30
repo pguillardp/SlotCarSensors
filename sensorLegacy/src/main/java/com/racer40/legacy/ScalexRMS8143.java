@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fazecast.jSerialComm.SerialPort;
+import com.fazecast.jSerialComm.SerialPortEvent;
 import com.racer40.sensor.DateTimeHelper;
 import com.racer40.sensor.Rs232;
 import com.racer40.sensor.SensorConstants;
@@ -32,7 +33,7 @@ public class ScalexRMS8143 extends Rs232 {
 
 	private final Logger logger = LoggerFactory.getLogger(ScalexRMS8143.class);
 
-	private byte fromRMS[] = new byte[256];
+	// private byte fromRMS[] = new byte[256];
 
 	public ScalexRMS8143() {
 		super();
@@ -42,9 +43,7 @@ public class ScalexRMS8143 extends Rs232 {
 		this.managedCars = MAX_STARTPOS;
 		this.pinoutImage = "rms8143_pinout.png";
 		this.image = "rms8143.jpg";
-		
 
-		this.poll = 10;
 		this.bauds = 9600;
 		databit = 8;
 		stopbit = SerialPort.ONE_STOP_BIT;
@@ -54,7 +53,10 @@ public class ScalexRMS8143 extends Rs232 {
 	}
 
 	@Override
-	protected void parseFrame(byte[] fromRMS, int numRead) {
+	protected void handleSerialEvent(SerialPortEvent event) {
+		byte[] fromRMS = event.getReceivedData();
+		int read = fromRMS.length;
+
 		// it's in the expected range => advise parent window
 		byte carByte = fromRMS[0];
 		int car = carByte - 0x31 + 1;
@@ -96,5 +98,11 @@ public class ScalexRMS8143 extends Rs232 {
 			}
 			pins.add(p);
 		}
+	}
+
+	@Override
+	public void discover(long timeout) {
+		// TODO Auto-generated method stub
+
 	}
 }

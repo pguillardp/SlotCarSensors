@@ -1,11 +1,10 @@
 package com.racer40.legacy;
 
-import java.io.IOException;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fazecast.jSerialComm.SerialPort;
+import com.fazecast.jSerialComm.SerialPortEvent;
 import com.racer40.sensor.Rs232;
 import com.racer40.sensor.SensorConstants;
 import com.racer40.sensor.SensorPinImpl;
@@ -87,8 +86,6 @@ public class Scalex7042 extends Rs232 {
 		this.ioPinList();
 		this.digital = true;
 
-		this.poll = 30;
-
 		this.bauds = 19200;
 		databit = 8;
 		stopbit = SerialPort.ONE_STOP_BIT;
@@ -120,7 +117,9 @@ public class Scalex7042 extends Rs232 {
 	 */
 
 	@Override
-	protected void parseFrame(byte[] from7042, int read) {
+	protected void handleSerialEvent(SerialPortEvent event) {
+		byte[] from7042 = event.getReceivedData();
+		int read = from7042.length;
 
 		// read serial port entry
 
@@ -182,9 +181,8 @@ public class Scalex7042 extends Rs232 {
 		to7042[OUT_LED] = (byte) ledStatus;
 		to7042[OUT_CHECKSUM] = (byte) checksum(to7042, 7);
 		try {
-			this.out.write(to7042);
-		} catch (IOException e) {
-
+			this.writeToSerial(to7042);
+		} catch (Exception e) {
 			logger.error("{}", e);
 		}
 	}
@@ -332,6 +330,12 @@ public class Scalex7042 extends Rs232 {
 		pin = new SensorPinImpl(this, "greenled.out.0" + MAX_CAR + 2, Scalex7042.GREEN_LED);
 		pin.setBounds(403, 91, 10, 10);
 		this.pins.add(pin);
+	}
+
+	@Override
+	public void discover(long timeout) {
+		// TODO Auto-generated method stub
+
 	}
 
 }

@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fazecast.jSerialComm.SerialPort;
+import com.fazecast.jSerialComm.SerialPortEvent;
 import com.racer40.sensor.Rs232;
 import com.racer40.sensor.SensorConstants;
 import com.racer40.sensor.SensorPinImpl;
@@ -54,11 +55,9 @@ public class Trackmate extends Rs232 {
 		this.managedCars = 8;
 		this.pinoutImage = "trackmate_pinout.png";
 		this.image = "trackmate.jpg";
-		
 
 		this.ioPinList();
 
-		this.poll = 10;
 		bauds = 9600;
 		databit = 8;
 		stopbit = SerialPort.ONE_STOP_BIT;
@@ -98,7 +97,10 @@ public class Trackmate extends Rs232 {
 	}
 
 	@Override
-	protected void parseFrame(byte[] fromTM, int read) {
+	protected void handleSerialEvent(SerialPortEvent event) {
+		byte[] fromTM = event.getReceivedData();
+		int read = fromTM.length;
+
 		buffer = (buffer != null) ? ArrayUtils.addAll(buffer, fromTM) : fromTM;
 
 		processBuffer(read);
@@ -303,4 +305,11 @@ public class Trackmate extends Rs232 {
 		}
 
 	}
+
+	@Override
+	public void discover(long timeout) {
+		// TODO Auto-generated method stub
+
+	}
+
 }

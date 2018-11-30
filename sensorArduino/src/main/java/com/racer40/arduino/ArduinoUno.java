@@ -1,7 +1,6 @@
 package com.racer40.arduino;
 
 import java.io.File;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -9,12 +8,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fazecast.jSerialComm.SerialPort;
-import com.fazecast.jSerialComm.SerialPortDataListener;
 import com.fazecast.jSerialComm.SerialPortEvent;
 import com.racer40.sensor.DateTimeHelper;
 import com.racer40.sensor.Rs232;
 import com.racer40.sensor.SensorConstants;
 import com.racer40.sensor.SensorPinImpl;
+import com.racer40.sensor.SensorPinInterface;
 import com.racer40.sensor.SystemUtils;
 
 /*
@@ -39,23 +38,30 @@ import com.racer40.sensor.SystemUtils;
  */
 // http://stackoverflow.com/questions/4436733/how-to-write-java-code-that-return-a-line-of-string-into-a-string-variable-from
 public class ArduinoUno extends Rs232 {
+	private static final char GET_DATE = 'D';
+
+	private static final char GET_PIN_VALUE = 'G';
+
+	private static final char RESET_DATE = 'R';
+
+	private static final char SET_PIN_VALUE = 'S';
+
+	private static final char GET_DATE_RESPONSE = 'D';
+
+	private static final char GET_PIN_RESPONSE = 'P';
+
+	private static final char PIN_CHANGED = 'C';
+
 	static final Logger logger = LoggerFactory.getLogger(ArduinoUno.class);
 
 	public static final String UNO = "Uno";
 
 	protected Map<String, Integer> waitget = new HashMap<>();
 
-	boolean readPort = false;
-
 	protected final static int[] UNO_OUT_PINS = new int[] { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 };
 	public final static int[] UNO_IN_PINS = new int[] { 12, 13, 14, 15, 16, 17, 18, 19 };
 
-	private final Thread mainThread;
-	private SerialPort comPort = null;
-	private String comPortName = "";
-
 	private byte rxBuffer[] = new byte[128];
-	private int rxPos;
 
 	public boolean isProgramming = false;
 
@@ -70,13 +76,10 @@ public class ArduinoUno extends Rs232 {
 
 		this.ioPinList();
 
-		this.poll = 1500;
 		this.bauds = 57600;
 		databit = 8;
 		stopbit = SerialPort.ONE_STOP_BIT;
 		parity = SerialPort.NO_PARITY;
-
-		mainThread = new Thread(new MainRunnable());
 	}
 
 	protected boolean isArduinoUno() {
@@ -88,108 +91,56 @@ public class ArduinoUno extends Rs232 {
 	}
 
 	@Override
-	public boolean start() {
+	protected void handleSerialEvent(SerialPortEvent event) {
+		byte[] data = event.getReceivedData();
 
-		closePort();
-
-		comPortName = this.port;
-		if (!"".equals(this.port)) {
-			SerialPort ports[] = SerialPort.getCommPorts();
-			for (SerialPort port : ports) {
-				if (port.getSystemPortName().equals(comPortName)) {
-					comPort = port;
-					comPort.addDataListener(new RxHandler());
-					openPort();
-					break;
-				}
+		for (int i = 0; i < data.length; ++i) {
+			rxBuffer[rxPos] = data[i];
+			if ((char) rxBuffer[0] != ArduinoUno.GET_PIN_RESPONSE && (char) rxBuffer[0] != ArduinoUno.PIN_CHANGED
+					&& (char) rxBuffer[0] != ArduinoUno.GET_DATE_RESPONSE) {
+				rxPos = 0;
+			} else {
+				rxPos++;
 			}
-		}
 
-		mainThread.start();
-		return true;
-	}
-
-	private class RxHandler implements SerialPortDataListener {
-
-		@Override
-		public int getListeningEvents() {
-			return SerialPort.LISTENING_EVENT_DATA_RECEIVED;
-		}
-
-		@Override
-		public void serialEvent(SerialPortEvent event) {
-			byte[] data = event.getReceivedData();
-			for (int i = 0; i < data.length; ++i) {
-				rxBuffer[rxPos] = data[i];
-				if ((char) rxBuffer[0] != 'P' && (char) rxBuffer[0] != 'C' && (char) rxBuffer[0] != 'D') {
+			switch ((char) rxBuffer[0]) {
+			case ArduinoUno.PIN_CHANGED:
+				if (rxPos == 10) {
 					rxPos = 0;
-				} else {
-					rxPos++;
+					String pinIdentifier = "digital.in." + ((int) rxBuffer[2]);
+					SensorPinImpl pin = getPin(pinIdentifier);
+					if (pin != null) {
+						long l = 0;
+						l |= rxBuffer[4] & 0xFF;
+						l <<= 8;
+						l |= rxBuffer[5] & 0xFF;
+						l <<= 8;
+						l |= rxBuffer[6] & 0xFF;
+						l <<= 8;
+						l |= rxBuffer[7] & 0xFF;
+						pin.setPinValueForNotification(
+								(rxBuffer[2] != 0) ? SensorConstants.PIN_ON : SensorConstants.PIN_OFF, l, false, true);
+					}
 				}
-
-				switch ((char) rxBuffer[0]) {
-				case 'C':
-					if (rxPos == 10) {
-						rxPos = 0;
-						String pinIdentifier = "digital.in." + ((int) rxBuffer[2]);
-						SensorPinImpl pin = getPin(pinIdentifier);
-						if (pin != null) {
-							long l = 0;
-							l |= rxBuffer[4] & 0xFF;
-							l <<= 8;
-							l |= rxBuffer[5] & 0xFF;
-							l <<= 8;
-							l |= rxBuffer[6] & 0xFF;
-							l <<= 8;
-							l |= rxBuffer[7] & 0xFF;
-							pin.setPinValueForNotification(
-									(rxBuffer[2] != 0) ? SensorConstants.PIN_ON : SensorConstants.PIN_OFF, l, false,
-									true);
-						}
+				break;
+			case ArduinoUno.GET_PIN_RESPONSE:
+				if (rxPos == 10) {
+					rxPos = 0;
+					synchronized (waitget) {
+						int pinno = rxBuffer[2];
+						String pin = pinno < 10 ? "0" + pinno : "" + pinno;
+						int pinvalue = (rxBuffer[9] & 0xff);
+						waitget.put(pin, pinvalue);
 					}
-					break;
-				case 'P':
-					if (rxPos == 10) {
-						rxPos = 0;
-						synchronized (waitget) {
-							String pin = "" + (int) rxBuffer[2];
-							waitget.put(pin, ((int) rxBuffer[9]));
-						}
-					}
-					break;
-				case 'D':
-					if (rxPos == 6) {
-						rxPos = 0;
-					}
-					break;
 				}
+				break;
+			case ArduinoUno.GET_DATE_RESPONSE:
+				if (rxPos == 6) {
+					rxPos = 0;
+				}
+				break;
 			}
 		}
-	}
-
-	@Override
-	public boolean setOutputPinValue(String pinIdentifier, int value) {
-		String[] s = pinIdentifier.split("\\.");
-		String pin = s[2].length() == 1 ? "0" + s[2] : s[2];
-		this.sendToArduino("s," + pin + ",0" + (value != 0 ? 1 : 0));
-		return true;
-	}
-
-	@Override
-	public int getPinValue(String pinIdentifier) {
-		String[] s = pinIdentifier.split("\\.");
-		String pin = s[2].length() == 1 ? "0" + s[2] : s[2];
-		long endwait = DateTimeHelper.getSystemTime() + 100;
-		waitget.put(pin, -1);
-		this.sendToArduino("g," + pin);
-		while (DateTimeHelper.getSystemTime() < endwait) {
-			synchronized (this.waitget) {
-				if (this.waitget.get(pin) != -1) {
-					return this.waitget.get(pin);
-				}
-			}
-		}
-		return -1;
 	}
 
 	/*
@@ -209,11 +160,11 @@ public class ArduinoUno extends Rs232 {
 			byte bytes[] = null;
 
 			switch (command.charAt(0)) {
-			case 'S':
+			case ArduinoUno.SET_PIN_VALUE:
 			case 's':
 				if (command.length() != 7 || command.charAt(1) != ',' || command.charAt(4) != ',') {
 					this.eventLogger.set(null);
-					this.eventLogger.set("Wrong command. Correct format: S,00,0");
+					this.eventLogger.set("Wrong command. Correct format: S,00,00");
 					return;
 				}
 
@@ -245,12 +196,12 @@ public class ArduinoUno extends Rs232 {
 
 				break;
 			case 'r':
-			case 'R':
+			case ArduinoUno.RESET_DATE:
 				bytes = new byte[1];
 				bytes[0] = (byte) 'R';
 				break;
 			case 'g':
-			case 'G':
+			case ArduinoUno.GET_PIN_VALUE:
 				if (command.length() != 4 || command.charAt(1) != ',') {
 					this.eventLogger.set(null);
 					this.eventLogger.set("Wrong command. Correct format: G,00");
@@ -275,10 +226,10 @@ public class ArduinoUno extends Rs232 {
 				bytes[0] = (byte) 'G';
 				bytes[1] = (byte) ',';
 				bytes[2] = (byte) pin;
-
 				break;
+
 			case 'd':
-			case 'D':
+			case ArduinoUno.GET_DATE:
 				bytes = new byte[1];
 				bytes[0] = (byte) 'D';
 				break;
@@ -288,16 +239,13 @@ public class ArduinoUno extends Rs232 {
 				return;
 			}
 
-			this.eventLogger.set(null);
-			this.eventLogger.set("Hex command:     " + bytesToHex(bytes));
-
 			if (comPort == null) {
 				this.eventLogger.set(null);
-				this.eventLogger.set("No COM port selected");
+				this.eventLogger.set("No COM port selected. Current: " + this.port);
 				return;
 			}
 
-			comPort.writeBytes(bytes, bytes.length);
+			writeToSerial(bytes);
 
 		} catch (Exception ex) {
 			this.eventLogger.set(null);
@@ -305,25 +253,13 @@ public class ArduinoUno extends Rs232 {
 		}
 	}
 
-	private boolean contains(int[] data, final int key) {
-		return Arrays.stream(data).anyMatch(i -> i == key);
-	}
-
-	private String bytesToHex(byte[] bytes) {
-		String result = "";
-
-		for (int i = 0; i < bytes.length; i++) {
-			result += String.format("%02X ", bytes[i]);
-			result += " ";
-		}
-
-		return result.trim();
-	}
-
+	/**
+	 * upload arduino sketch
+	 */
 	protected void uploadSketch() {
 		if (comPort == null || "".equals(comPort)) {
 			this.eventLogger.set(null);
-			this.eventLogger.set("COM Port not selected");
+			this.eventLogger.set("COM Port not selected. Current: " + this.port);
 			return;
 		}
 
@@ -339,14 +275,13 @@ public class ArduinoUno extends Rs232 {
 			public void run() {
 				isProgramming = true;
 				try {
-					closePort();
+					this.stop();
 
 					String toolsFolder = SystemUtils.getToolsFolder();
 
 					String AVRDudePath = toolsFolder + "avrdude.exe";
 					String confPath = toolsFolder + "avrdude.conf";
 					String workingDir = toolsFolder;
-					String port = comPortName;
 					String hexPath = "";
 					String command = "";
 
@@ -368,7 +303,7 @@ public class ArduinoUno extends Rs232 {
 					logger.debug("Process exitValue: {}", exitVal);
 					eventLogger.set(null);
 					eventLogger.set("HEX write result: " + (exitVal == 0 ? "OK" : "ERROR " + String.valueOf(exitVal)));
-					openPort();
+					this.start();
 					isProgramming = false;
 
 				} catch (Exception ex) {
@@ -383,47 +318,19 @@ public class ArduinoUno extends Rs232 {
 		thread.start();
 	}
 
-	private void openPort() {
-		comPort.setComPortParameters(this.bauds, this.databit, this.stopbit, this.parity);
-		if (!comPort.openPort()) {
-			closePort();
-		}
-		rxPos = 0;
-	}
-
-	private void closePort() {
-		if (comPort == null) {
-			return;
-		}
-		this.readPort = false;
-		comPort.closePort();
-	}
-
-	private class MainRunnable implements Runnable {
-
-		@Override
-		public void run() {
-			readPort = true;
-			while (readPort) {
-				if ("".equals(comPortName) || comPort == null) {
-					continue;
-				}
+	@Override
+	public void reset() {
+		this.sendToArduino(ArduinoUno.RESET_DATE + "");
+		for (SensorPinInterface pin : this.getPinList()) {
+			if (pin.isOutput()) {
+				this.setOutputPinValue(pin.getPinIdentifier(), 0);
 				try {
-					this.wait(10);
+					Thread.sleep(5);
 				} catch (InterruptedException e) {
-					logger.error("{}");
-				}
-				if (!comPort.isOpen()) {
-					comPort.openPort();
+					logger.error("{}", e);
 				}
 			}
 		}
-	}
-
-	@Override
-	protected void parseFrame(byte[] frame, int numRead) {
-		// TODO Auto-generated method stub
-
 	}
 
 	/**
@@ -456,6 +363,34 @@ public class ArduinoUno extends Rs232 {
 	}
 
 	@Override
+	public boolean setOutputPinValue(String pinIdentifier, int value) {
+		String[] s = pinIdentifier.split("\\.");
+		String pin = s[2].length() == 1 ? "0" + s[2] : s[2];
+		this.sendToArduino("s," + pin + ",0" + (value != 0 ? 1 : 0));
+		this.getPin(pinIdentifier).setPinValueForNotification(
+				(value != 0) ? SensorConstants.PIN_ON : SensorConstants.PIN_OFF, DateTimeHelper.getSystemTime(), false,
+				true);
+		return true;
+	}
+
+	@Override
+	public int getPinValue(String pinIdentifier) {
+		String[] s = pinIdentifier.split("\\.");
+		String pin = s[2].length() == 1 ? "0" + s[2] : s[2];
+		long endwait = DateTimeHelper.getSystemTime() + 500;
+		waitget.put(pin, -1);
+		this.sendToArduino("g," + pin);
+		while (DateTimeHelper.getSystemTime() < endwait) {
+			synchronized (this.waitget) {
+				if (this.waitget.get(pin) != -1) {
+					return this.waitget.get(pin);
+				}
+			}
+		}
+		return -1;
+	}
+
+	@Override
 	protected void ioPinList() {
 		pins.clear();
 
@@ -468,7 +403,7 @@ public class ArduinoUno extends Rs232 {
 			} else {
 				pinName = i + "";
 			}
-			SensorPinImpl p = new SensorPinImpl(this, identifier, i + " " + pinName);
+			SensorPinImpl p = new SensorPinImpl(this, identifier, pinName);
 			pins.add(p);
 			p.setBounds(50 + (j % 10) * 25, 100 + (j / 10) * 25, 20, 20);
 		}
@@ -481,7 +416,7 @@ public class ArduinoUno extends Rs232 {
 			} else {
 				pinName = i + "";
 			}
-			SensorPinImpl p = new SensorPinImpl(this, identifier, i + " " + pinName);
+			SensorPinImpl p = new SensorPinImpl(this, identifier, pinName);
 			pins.add(p);
 			p.setBounds(50 + (j % 10) * 25, 200 + (j / 10) * 25, 20, 20);
 		}

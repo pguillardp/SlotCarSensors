@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fazecast.jSerialComm.SerialPort;
+import com.fazecast.jSerialComm.SerialPortEvent;
 import com.racer40.sensor.Rs232;
 import com.racer40.sensor.SensorPinImpl;
 
@@ -31,7 +32,7 @@ public abstract class DSxxx extends Rs232 {
 
 	public DSxxx() {
 		super();
-		this.poll = 10;
+
 		this.bauds = 4800;
 		databit = 8;
 		stopbit = SerialPort.ONE_STOP_BIT;
@@ -47,12 +48,10 @@ public abstract class DSxxx extends Rs232 {
 	}
 
 	@Override
-	public void stop() {
-		super.stop();
-	}
+	protected void handleSerialEvent(SerialPortEvent event) {
+		byte[] fromDS = event.getReceivedData();
+		int numRead = fromDS.length;
 
-	@Override
-	protected void parseFrame(byte[] fromDS, int numRead) {
 		byte c = fromDS[0];
 		intc = (byte) (c & 0xFF); /*
 									 * This solves some leading FF problems with negative numbers.

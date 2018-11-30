@@ -1,11 +1,10 @@
 package com.racer40.legacy;
 
-import java.io.IOException;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fazecast.jSerialComm.SerialPort;
+import com.fazecast.jSerialComm.SerialPortEvent;
 import com.racer40.sensor.DateTimeHelper;
 import com.racer40.sensor.Rs232;
 import com.racer40.sensor.SensorConstants;
@@ -66,9 +65,7 @@ public class CarreraCU extends Rs232 {
 		this.image = "carreraCU.bmp";
 		this.pinoutImage = "carreraCU_pinout.png";
 		this.digital = true;
-		
 
-		this.poll = 10;
 		this.bauds = 19200;
 		databit = 8;
 		stopbit = SerialPort.ONE_STOP_BIT;
@@ -162,15 +159,18 @@ public class CarreraCU extends Rs232 {
 	 * Time = 808515358
 	 */
 	@Override
-	protected void parseFrame(byte[] fromCU, int read) {
+	protected void handleSerialEvent(SerialPortEvent event) {
+		byte[] fromCU = event.getReceivedData();
+		int numRead = fromCU.length;
+
 		// check for errors + init dialog with unit
 		try {
-			if (this.in.available() == 0) {
-				this.out.write(this.queryStatus);
+			if (numRead == 0) {
+				this.writeToSerial(this.queryStatus);
 				return;
 			}
 
-			if (read > 4) {
+			if (numRead > 4) {
 				this.monitorHexaFrame(fromCU);
 			}
 
@@ -245,9 +245,9 @@ public class CarreraCU extends Rs232 {
 			fromCU = null;
 
 			// poll status before leaving
-			this.out.write(this.queryStatus);
+			this.writeToSerial(this.queryStatus);
 
-		} catch (IOException e) {
+		} catch (Exception e) {
 			logger.error("{}", e);
 		}
 
@@ -276,5 +276,11 @@ public class CarreraCU extends Rs232 {
 			pins.add(p);
 			p.setBounds(124 + i * 26, 276, 20, 41);
 		}
+	}
+
+	@Override
+	public void discover(long timeout) {
+		// TODO Auto-generated method stub
+
 	}
 }

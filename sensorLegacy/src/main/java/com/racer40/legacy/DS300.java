@@ -16,7 +16,7 @@ public class DS300 extends DSxxx {
 		this.image = "DS300.jpg";
 		this.ioPinList();
 
-		this.poll = 10;
+		
 		bauds = 57600;
 		databit = 8;
 		stopbit = SerialPort.ONE_STOP_BIT;

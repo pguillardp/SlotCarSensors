@@ -27,7 +27,6 @@ public class ArduinoMega extends ArduinoUno {
 
 		this.ioPinList();
 
-		this.poll = 1500;
 		this.bauds = 57600;
 		databit = 8;
 		stopbit = SerialPort.ONE_STOP_BIT;

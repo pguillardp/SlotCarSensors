@@ -295,36 +295,6 @@ public abstract class SensorImpl implements SensorInterface {
 		this.userId = userId;
 	}
 
-	/**
-	 * sensor status
-	 *
-	 * @author Pierrick
-	 *
-	 */
-	public class SensorStatus {
-		private String status = "";
-		private boolean error = false;
-
-		public SensorStatus() {
-		}
-
-		public String getStatus() {
-			return status;
-		}
-
-		public void setStatus(String status) {
-			this.status = status;
-		}
-
-		public boolean isError() {
-			return error;
-		}
-
-		public void setError(boolean error) {
-			this.error = error;
-		}
-	}
-
 	@Override
 	public boolean isDebugMode() {
 		return debugMode;
@@ -376,6 +346,36 @@ public abstract class SensorImpl implements SensorInterface {
 
 	public void setVersion(String version) {
 		this.version = version;
+	}
+
+	/**
+	 * sensor status
+	 *
+	 * @author Pierrick
+	 *
+	 */
+	public class SensorStatus {
+		private String status = "";
+		private boolean error = false;
+
+		public SensorStatus() {
+		}
+
+		public String getStatus() {
+			return status;
+		}
+
+		public void setStatus(String status) {
+			this.status = status;
+		}
+
+		public boolean isError() {
+			return error;
+		}
+
+		public void setError(boolean error) {
+			this.error = error;
+		}
 	}
 
 }

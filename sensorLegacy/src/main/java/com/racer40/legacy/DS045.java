@@ -16,7 +16,7 @@ public class DS045 extends DSxxx {
 		this.pinoutImage = "ds045_pinout.png";
 		this.ioPinList();
 
-		this.poll = 10;
+		
 		bauds = 9600;
 		databit = 8;
 		stopbit = SerialPort.ONE_STOP_BIT;

@@ -39,6 +39,7 @@ import javafx.fxml.Initializable;
 import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
@@ -53,6 +54,9 @@ import javafx.util.Callback;
 
 public class TesterController implements Initializable {
 	private static final Logger logger = LoggerFactory.getLogger(TesterController.class);
+
+	@FXML
+	private CheckBox chkDebug;
 
 	@FXML
 	private ListView<SensorInterface> cmbFoundSensors;
@@ -163,6 +167,14 @@ public class TesterController implements Initializable {
 	void onPortChange(ActionEvent event) {
 		if (this.currentSensor() != null) {
 			this.stopSensor();
+		}
+	}
+
+	@FXML
+	void onDebug(ActionEvent event) {
+		if (this.currentSensor() != null) {
+			this.currentSensor().setDebugMode(this.chkDebug.isSelected());
+			;
 		}
 	}
 
@@ -294,6 +306,7 @@ public class TesterController implements Initializable {
 			this.currentSensor().setPort(this.cmbPort.getSelectionModel().getSelectedItem());
 			SensorInterface currentSensor = this.currentSensor();
 			currentSensor.setSetup(this.editSetup.getText());
+			currentSensor.setDebugMode(this.chkDebug.isSelected());
 			this.currentSensor().start();
 			if (this.currentSensor().isStarted()) {
 				this.statusImage.setImage(this.led_on);

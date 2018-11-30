@@ -14,7 +14,7 @@ public class CarreraBB extends CarreraCU {
 		this.image = "carreraBB.bmp";
 		this.pinoutImage = "carreraBB_pinout.png";
 
-		this.poll = 10;
+		
 		this.bauds = 19200;
 		databit = 8;
 		stopbit = SerialPort.ONE_STOP_BIT;
