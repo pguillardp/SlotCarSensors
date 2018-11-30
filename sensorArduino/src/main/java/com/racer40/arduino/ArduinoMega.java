@@ -41,8 +41,8 @@ public class ArduinoMega extends ArduinoUno {
 		for (int j = 0; j < MEGA_IN_PINS.length; j++) {
 			int i = MEGA_IN_PINS[j];
 			String identifier = "digital.in." + i;
-			if (i >= 14 && i <= 19) {
-				pinName = "-A" + (i - 14);
+			if (i >= 54) {
+				pinName = "-A" + (54 + 15 - i);
 			} else {
 				pinName = i + "";
 			}
