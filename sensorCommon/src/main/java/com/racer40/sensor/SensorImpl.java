@@ -348,6 +348,11 @@ public abstract class SensorImpl implements SensorInterface {
 		this.version = version;
 	}
 
+	@Override
+	public String getConfigurationHelp() {
+		return "";
+	}
+
 	/**
 	 * sensor status
 	 *

@@ -29,7 +29,7 @@ public abstract class Rs232 extends SensorImpl {
 
 	protected int rxPos;
 
-	private static final int HEX_COLUMNS = 16;
+	protected static final int HEX_COLUMNS = 16;
 
 	public Rs232() {
 		super();
@@ -80,16 +80,11 @@ public abstract class Rs232 extends SensorImpl {
 				@Override
 				public void serialEvent(SerialPortEvent event) {
 					handleSerialEvent(event);
-					if (isDebugMode() && event.getReceivedData().length > 0) {
-						eventLogger.set(null);
-						eventLogger.set(bytesToHex("<- from sensor", event.getReceivedData(), Rs232.HEX_COLUMNS));
-					}
 				}
 			});
 
 			rxPos = 0;
 			if (comPort.openPort()) {
-				this.reset();
 				return true;
 			}
 		}
@@ -193,6 +188,42 @@ public abstract class Rs232 extends SensorImpl {
 	@Override
 	public String getSetup() {
 		return this.bauds + "," + this.databit + "," + this.parity + "," + this.stopbit;
+	}
+
+	@Override
+	public void discover(long timeout) {
+		// TODO Auto-generated method stub
+
+	}
+
+	@Override
+	public void setSetup(String setup) {
+		super.setSetup(setup);
+		String[] s = setup.replace(" ", "").split(",");
+		try {
+			if (s.length >= 1) {
+				this.bauds = Integer.parseInt(s[0]);
+			}
+			if (s.length >= 2) {
+				this.databit = Integer.parseInt(s[1]);
+			}
+			if (s.length >= 3) {
+				this.parity = Integer.parseInt(s[2]);
+			}
+			if (s.length >= 4) {
+				this.stopbit = Integer.parseInt(s[3]);
+			}
+		} catch (Exception e) {
+
+		} finally {
+
+		}
+	}
+
+	@Override
+	protected void ioPinList() {
+		// TODO Auto-generated method stub
+
 	}
 
 }

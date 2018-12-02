@@ -16,8 +16,7 @@ public class DS200 extends DSxxx {
 		this.image = "DS200.jpg";
 		this.ioPinList();
 
-		
-		bauds = 9600;
+		bauds = 57600;
 		databit = 8;
 		stopbit = SerialPort.ONE_STOP_BIT;
 		parity = SerialPort.NO_PARITY;

@@ -1,10 +1,16 @@
 package com.racer40.legacy;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fazecast.jSerialComm.SerialPort;
 import com.fazecast.jSerialComm.SerialPortEvent;
+import com.racer40.sensor.DateTimeHelper;
 import com.racer40.sensor.Rs232;
 import com.racer40.sensor.SensorPinImpl;
 
@@ -17,10 +23,13 @@ public abstract class DSxxx extends Rs232 {
 
 	private static final int MAX_STARTPOS = 8;
 
-	private byte dataWord[] = new byte[TOTAL_BYTES], olddataWord[] = new byte[TOTAL_BYTES];
+	private byte dataWord[] = new byte[TOTAL_BYTES * 3];
+	private byte frame[] = new byte[TOTAL_BYTES];
+	private int frameno = -1;
 	private int byteCount, i, checksum;
 	private boolean sync = false;
 	private byte intc;
+	private int received = 0;
 
 	private boolean newdata;
 
@@ -48,64 +57,64 @@ public abstract class DSxxx extends Rs232 {
 	}
 
 	@Override
+	public boolean start() {
+		this.received = 0;
+		this.frameno = Integer.MIN_VALUE;
+		return super.start();
+	}
+
+	@Override
 	protected void handleSerialEvent(SerialPortEvent event) {
 		byte[] fromDS = event.getReceivedData();
-		int numRead = fromDS.length;
+		for (int i = 0; i < fromDS.length; i++) {
+			this.dataWord[this.received + i] = fromDS[i];
+			this.received++;
+		}
 
-		byte c = fromDS[0];
-		intc = (byte) (c & 0xFF); /*
-									 * This solves some leading FF problems with negative numbers.
-									 */
-
-		// If not in sync, check for synchronization to 21 byte data word.
-		if (!sync) {
-			if (intc == START_BYTE) {
-				byteCount = 0;
-				dataWord[byteCount++] = intc;
-				sync = true;
-			} else {
-				logger.debug(String.format("c is %02x not %02x.\n", intc, START_BYTE));
-				if (this.isDebugMode()) {
-					this.eventLogger.set("Unknown received frame:");
-					this.monitorHexaFrame(fromDS);
+		// try to parse frame
+		int i = 0;
+		while (this.received >= TOTAL_BYTES) {
+			for (; (i <= this.received - TOTAL_BYTES); i++) {
+				if (this.dataWord[i] == START_BYTE && this.dataWord[i + TOTAL_BYTES - 1] == END_BYTE
+						&& this.dataWord[i + 2] == TOTAL_BYTES) {
+					this.parseFrame(i);
+					this.received -= TOTAL_BYTES;
+					i += (TOTAL_BYTES - 1);
+				} else {
+					this.received--;
 				}
 			}
 
-			// parsed synchronized data
-		} else {
-			dataWord[byteCount++] = c;
-			if (byteCount >= TOTAL_BYTES) {
-				byteCount = 0;
-
-				/*
-				 * See if dataWord is new. DS300 has a habit of spitting out three identical
-				 * dataWords in a row. We don't need to look at it three times.
-				 */
-				newdata = false;
-				for (i = 0; i < TOTAL_BYTES; i++) {
-					if (olddataWord[i] != dataWord[i]) {
-						newdata = true;
-						break;
-					}
-				}
-
-				// parse new data
-				if (newdata) {
-					started = true;
-					parseFrame();
-				}
-			} // end of total bytes found
 		}
-
+		// shift buffer beginning
+		for (int j = i; j < this.received; j++) {
+			this.dataWord[j - i] = this.dataWord[j];
+		}
 	}
 
 	/**
 	 * parse a newly received frame
+	 * 
+	 * @param offset
 	 */
-	private void parseFrame() {
+	private void parseFrame(int offset) {
 		StringBuilder information = new StringBuilder();
 
-		monitorHexaFrame(this.dataWord);
+		this.framefound = true;
+
+		for (int j = 0; j < TOTAL_BYTES; j++) {
+			this.frame[j] = this.dataWord[offset + j];
+		}
+		if (isDebugMode()) {
+			this.eventLogger.set(null);
+			this.eventLogger.set(bytesToHex("<- from sensor", frame, Rs232.HEX_COLUMNS));
+		}
+
+		// consistency checks
+		if (this.frameno == this.frame[1]) {
+			return;
+		}
+		this.frameno = this.frame[1];
 
 		// detection pin
 		SensorPinImpl pin = null;
@@ -117,139 +126,141 @@ public abstract class DSxxx extends Rs232 {
 		int lane = 0;
 
 		// Display results of data word. => DS revision
-		if (dataWord[3] == 2) {
-			logger.debug("DS200: \n");
-			information.append("DS200");
+		if (this.frame[3] == 2) {
+			this.eventLogger.set("DS200 found");
 			this.ds200 = true;
 			this.ds300 = false;
-		} else if (dataWord[3] == 3) {
-			logger.debug("DS300: \n");
-			information.append("DS300");
+		} else if (this.frame[3] == 3) {
+			this.eventLogger.set("DS300 found");
 			this.ds200 = false;
 			this.ds300 = true;
 		}
 
 		// extract & Display type of data
-		switch (dataWord[7]) {
+		switch (this.frame[7]) {
 		case 0x00:
-			logger.debug("Function ");
+			this.eventLogger.set("Function ");
 			break;
 		case 0x1B:
-			logger.debug("Timing data ");
+			this.eventLogger.set("Timing data ");
 			information.append(" - Timing data");
 			break;
 		case 0x1C:
-			logger.debug("Final record data ");
+			this.eventLogger.set("Final record data ");
 			information.append(" - Final record data");
 			break;
 		case 0x3A:
-			logger.debug("Programmed by time ");
+			this.eventLogger.set("Programmed by time ");
 			information.append(" - Programmed by time");
 			break;
 		case 0x3B:
-			logger.debug("Programmed by laps (total) ");
+			this.eventLogger.set("Programmed by laps (total) ");
 			information.append(" - Programmed by laps (total)");
 			break;
 		case 0x3C:
-			logger.debug("Programmed by laps (individual) ");
+			this.eventLogger.set("Programmed by laps (individual) ");
 			information.append(" - Programmed by laps (indi))");
 			break;
 		case 0x3D:
-			logger.debug("Programmed by F1 ");
+			this.eventLogger.set("Programmed by F1 ");
 			information.append(" - Programmed by F1");
 			break;
 		case 0x3F:
 			information.append(" - Press start race button");
-			logger.debug("Press start race button");
+			this.eventLogger.set("Press start race button");
 			break;
 		default:
 			information.append(" - Unknown data");
-			logger.debug(String.format("Unknown data %02x ", dataWord[7]));
+			this.eventLogger.set(String.format("Unknown data %02x ", this.frame[7]));
 			break;
 		}
 
 		// Display type of function (assuming we have a function).
-		if (dataWord[7] == 0x00) {
-			switch (dataWord[8]) {
+		if (this.frame[7] == 0x00) {
+			switch (this.frame[8]) {
 			case (byte) 0xA1:
-				logger.debug("Start of race, phase 1 "); // not
-															// managed
-															// by DS
+				this.eventLogger.set("Start of race, phase 1 "); // not
+				// managed
+				// by DS
 				information.append(" - Start#1");
 				break;
 			case (byte) 0xA2:
-				logger.debug("Start of race, phase 2 "); // not
-															// managed
-															// by DS
+				this.eventLogger.set("Start of race, phase 2 "); // not
+				// managed
+				// by DS
 				information.append(" - Start#2");
 				break;
 			case (byte) 0xA3:
-				logger.debug("Start of race, phase 3 "); // not
-															// managed
-															// by DS
+				this.eventLogger.set("Start of race, phase 3 "); // not
+				// managed
+				// by DS
 				information.append(" - Start#3");
 				break;
 			case (byte) 0xA4:
-				logger.debug("End of race "); // not managed by DS
+				this.eventLogger.set("End of race "); // not managed by DS
 				information.append(" - End of race");
 				break;
+
 			case (byte) 0xA5:
-				logger.debug("Start of pause ");
+				this.eventLogger.set("Start of pause ");
 				information.append(" - Pause");
 				pin = this.getPin("pause.in.0");
 				break;
+
 			case (byte) 0xA6:
-				logger.debug("End of pause ");
+				this.eventLogger.set("End of pause ");
 				information.append(" - End pause");
 				pin = this.getPin("resume.in.0");
 				break;
+
 			case (byte) 0xA7:
-				logger.debug("Abort race ");
+				this.eventLogger.set("Abort race ");
 				information.append(" - Abort");
 				pin = this.getPin("abort.in.0");
 				break;
+
 			default:
 				information.append(" - Unknown");
-				logger.debug(String.format("Unknown function %02x ", dataWord[8]));
+				this.eventLogger.set(String.format("Unknown function %02x ", this.frame[8]));
 				break;
 			}
 		}
 
 		// start race
-		if (dataWord[8] == 0xA1) {
+		if (this.frame[8] == 0xA1) {
 
 			/*
 			 * If start of race (0xA1), next two bytes have different meaning.
 			 */
 			pin = this.getPin("go.in.0");
-			logger.debug(String.format("Program values: %02x and %02x\n", dataWord[9], dataWord[10]));
+			this.eventLogger.set(String.format("Program values: %02x and %02x\n", this.frame[9], this.frame[10]));
 
 			// on going race event
 		} else {
 
 			/* Display Identifiers. */
-			switch (dataWord[9]) {
+			switch (this.frame[9]) {
 			case (byte) 0xA8:
 				/*
 				 * Documentation say this should be "1st position. Actual use looks like this is
 				 * really fast lap.
 				 */
-				/* logger.debug("1st position "); */
-				logger.debug("Fast lap ");
+				/* this.eventLogger.set("1st position "); */
+				this.eventLogger.set("Fast lap ");
 				break;
 			case (byte) 0xA9:
-				logger.debug("Fast lap ");
+				this.eventLogger.set("Fast lap ");
 				break;
 			default:
-				/* logger.debug("Identifier %02x ", dataWord[9]); */
+				/* this.eventLogger.set("Identifier %02x ", this.frame[9]); */
 				break;
 			}
 
 			/* timing data */
-			if (dataWord[7] == 0x1B) {
+			if (this.frame[7] == 0x1B) {
 
 				/* Display Lane number. */
-				switch (dataWord[10]) {
+				switch (this.frame[10]) {
 				case (byte) 0x80:
 					lane = 1;
 					break;
@@ -275,7 +286,7 @@ public abstract class DSxxx extends Rs232 {
 					lane = 8;
 					break;
 				default:
-					logger.debug(String.format("Unknown lane number %02x\n", dataWord[10]));
+					this.eventLogger.set(String.format("Unknown lane number %02x\n", this.frame[10]));
 					break;
 				}
 				int bridge = lane;
@@ -287,7 +298,7 @@ public abstract class DSxxx extends Rs232 {
 					if (this instanceof DS200 || this instanceof DS300) {
 						pinlane = (lane & 1) + 1;
 					}
-					logger.debug("lane " + lane);
+					this.eventLogger.set("lane " + lane);
 
 					pin = this.getPin(pinlane + "");
 					pin.setDetectionID(lane);
@@ -300,25 +311,25 @@ public abstract class DSxxx extends Rs232 {
 		}
 
 		/* Display Number of laps. */
-		int nLap = (dataWord[11] >> 4) * 1000 + (dataWord[11] & 0xf) * 100 + (dataWord[12] >> 4) * 10
-				+ (dataWord[12] & 0xf);
-		logger.debug("Laps " + nLap);
+		int nLap = (this.frame[11] >> 4) * 1000 + (this.frame[11] & 0xf) * 100 + (this.frame[12] >> 4) * 10
+				+ (this.frame[12] & 0xf);
+		this.eventLogger.set("Laps " + nLap);
 		information.append(String.format(" - lap %d", nLap));
 
 		/* Display hours, minutes, seconds. */
-		logger.debug(String.format("HH:MM:SS %1d%1d:%1d%1d:%1d%1d.", dataWord[13] >> 4, dataWord[13] & 0xf,
-				dataWord[14] >> 4, dataWord[14] & 0xf, dataWord[15] >> 4, dataWord[15] & 0xf));
+		this.eventLogger.set(String.format("HH:MM:SS %1d%1d:%1d%1d:%1d%1d.", this.frame[13] >> 4, this.frame[13] & 0xf,
+				this.frame[14] >> 4, this.frame[14] & 0xf, this.frame[15] >> 4, this.frame[15] & 0xf));
 		int nHour = 0, nMinute = 0, nSecond = 0;
 		long lMilli = 0L;
 		if (nLap > 1) {
-			nHour = (((dataWord[13] & 0xff) >> 4) * 10 + (dataWord[13] & 0xf)) % 24;
-			nMinute = ((dataWord[14] >> 4) * 10 + (dataWord[14] & 0xf)) % 60;
-			nSecond = ((dataWord[15] >> 4) * 10 + (dataWord[15] & 0xf)) % 60;
-			lMilli = ((((dataWord[16] & 0xff) >> 4) * 100) + (((dataWord[16] & 0xf)) * 10)
-					+ ((dataWord[17] & 0xff) >> 4)) % 1000;
+			nHour = (((this.frame[13] & 0xff) >> 4) * 10 + (this.frame[13] & 0xf)) % 24;
+			nMinute = ((this.frame[14] >> 4) * 10 + (this.frame[14] & 0xf)) % 60;
+			nSecond = ((this.frame[15] >> 4) * 10 + (this.frame[15] & 0xf)) % 60;
+			lMilli = ((((this.frame[16] & 0xff) >> 4) * 100) + (((this.frame[16] & 0xf)) * 10)
+					+ ((this.frame[17] & 0xff) >> 4)) % 1000;
 			if (lMilli < 0) {
-				long l = (((dataWord[16] >> 4) * 100) + ((dataWord[16] & 0xf) * 10) + (dataWord[17] >> 4));
-				logger.debug("negative: " + l);
+				long l = (((this.frame[16] >> 4) * 100) + ((this.frame[16] & 0xf) * 10) + (this.frame[17] >> 4));
+				this.eventLogger.set("negative: " + l);
 			}
 		}
 
@@ -327,38 +338,18 @@ public abstract class DSxxx extends Rs232 {
 		// Display fractions of a second
 		// nb : the DSxxx event timer and ur3 timer are not
 		// synchronised => do it when needed
-		logger.debug(String.format("%1d%1d%1d%1d.", dataWord[16] >> 4, dataWord[16] & 0xf, dataWord[17] >> 4,
-				dataWord[17] & 0xf));
-		// pin.setHour(nHour);
-		// pin.setMinute(nMinute);
-		// pin.setSecond(nSecond);
+		this.eventLogger.set(String.format("%1d%1d%1d%1d.", this.frame[16] >> 4, this.frame[16] & 0xf,
+				this.frame[17] >> 4, this.frame[17] & 0xf));
 		pin.setTimeEvent(((long) nHour * 3600 + (long) nMinute * 60 + nSecond) * 1000 + lMilli, true);
 
 		// Test checksum.
 		for (i = 1, checksum = 0; i < 18; i++) {
-			checksum += dataWord[i];
+			checksum += this.frame[i];
 		}
-		checksum += dataWord[19];
-		if ((checksum & 0xff) != dataWord[18]) {
-			logger.debug(
-					String.format("Warning: Checksum failure.  Was %02x not %02x.\n", (checksum & 0xff), dataWord[18]));
-		}
-
-		/* Display any errors in data word. */
-		if (dataWord[2] != TOTAL_BYTES) {
-			logger.debug(
-					String.format("Warning: Word length incorrect.  Was %02x not %02x.\n", dataWord[2], TOTAL_BYTES));
-			notify = false;
-		}
-		if (dataWord[TOTAL_BYTES - 1] != END_BYTE) {
-			logger.debug(String.format("Warning: End byte incorrect.  Was %02x not %02x.\n", dataWord[TOTAL_BYTES - 1],
-					END_BYTE));
-			notify = false;
-		}
-
-		// Save dataWord.
-		for (i = 0; i < TOTAL_BYTES; i++) {
-			olddataWord[i] = dataWord[i];
+		checksum += this.frame[19];
+		if ((checksum & 0xff) != this.frame[18]) {
+			this.eventLogger.set(String.format("Warning: Checksum failure.  Was %02x not %02x.\n", (checksum & 0xff),
+					this.frame[18]));
 		}
 
 		// new data parsed => forward event to sensor if parsing is
@@ -383,9 +374,69 @@ public abstract class DSxxx extends Rs232 {
 		return ds300;
 	}
 
+	private List<DS200> todiscover = new ArrayList<>();
+	private List<DS200> found = new ArrayList<>();
+	private Timer timer;
+	protected boolean framefound = false;
+	private long prevsec = -1;
+	private long prevdate = -1;
+
 	@Override
 	public void discover(long timeout) {
-		// TODO Auto-generated method stub
 
+		// start one sensor per available port
+		this.eventLogger.set(null);
+		this.eventLogger.set("Search for DSxxx during " + timeout + "ms. Trigger detection during this timeframe");
+		this.todiscover.clear();
+		this.found.clear();
+
+		// one sensor per port
+		List<String> ports = this.getSerialPortList();
+		for (String port : ports) {
+			DS200 ds = new DS200();
+			this.todiscover.add(ds);
+			ds.setPort(port);
+			ds.setSetup("57600,8,0,1");
+			ds.framefound = false;
+			ds.start();
+		}
+
+		// timer to countdown search seconds
+		long startdate = DateTimeHelper.getSystemTime();
+		prevdate = startdate;
+		TimerTask repeatedTask = new TimerTask() {
+			@Override
+			public void run() {
+				long d = DateTimeHelper.getSystemTime();
+				long diff = d - prevdate;
+				prevdate = d;
+				if (diff > timeout) {
+					timer.cancel();
+				}
+				long sec = (timeout - diff) / 1000;
+				if (prevsec != sec) {
+					prevsec = sec;
+					eventLogger.set("Detecting ........ " + sec + "s");
+				}
+				for (DS200 ds : todiscover) {
+					if (ds.framefound && !found.contains(ds)) {
+						found.add(ds);
+						discoveredInterface.set(ds);
+					}
+
+					if ((timeout - diff) > (2 * timeout / 3) && !ds.getSetup().equals("4600,8,0,1")) {
+						ds.stop();
+						ds.setSetup("4800,8,0,1");
+						ds.start();
+					} else if ((timeout - diff) > (timeout / 3) && !ds.getSetup().equals("9600,8,0,1")) {
+						ds.stop();
+						ds.setSetup("9600,8,0,1");
+						ds.start();
+					}
+				}
+			}
+		};
+		timer = new Timer("Timer");
+		timer.scheduleAtFixedRate(repeatedTask, timeout, 100);
 	}
 }

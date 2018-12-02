@@ -159,7 +159,11 @@ public class TesterController implements Initializable {
 
 			selectedItem.getDiscoveredInterface().removeListener(this.discoveryListener);
 			selectedItem.getDiscoveredInterface().addListener(this.discoveryListener);
-			selectedItem.discover(-1l);
+			if (selectedItem instanceof DS300 || selectedItem instanceof DS200 || selectedItem instanceof DS045) {
+				selectedItem.discover(20l);
+			} else {
+				selectedItem.discover(-1l);
+			}
 		}
 	}
 

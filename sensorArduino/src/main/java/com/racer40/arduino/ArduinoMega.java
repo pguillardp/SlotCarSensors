@@ -46,7 +46,7 @@ public class ArduinoMega extends ArduinoUno {
 			} else {
 				pinName = i + "";
 			}
-			SensorPinImpl p = new SensorPinImpl(this, identifier, i + " " + pinName);
+			SensorPinImpl p = new SensorPinImpl(this, identifier, pinName);
 			pins.add(p);
 			p.setBounds(50 + (j % 10) * 30, 100 + (j / 10) * 30, 20, 20);
 		}
@@ -54,12 +54,7 @@ public class ArduinoMega extends ArduinoUno {
 		for (int j = 0; j < MEGA_OUT_PINS.length; j++) {
 			int i = MEGA_OUT_PINS[j];
 			String identifier = "digital.out." + i;
-			if (i >= 14 && i <= 19) {
-				pinName = "-A" + (i - 14);
-			} else {
-				pinName = i + "";
-			}
-			SensorPinImpl p = new SensorPinImpl(this, identifier, i + " " + pinName);
+			SensorPinImpl p = new SensorPinImpl(this, identifier, i + "");
 			pins.add(p);
 			p.setBounds(50 + (j % 10) * 30, 250 + (j / 10) * 30, 20, 20);
 		}

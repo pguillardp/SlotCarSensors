@@ -62,8 +62,11 @@ public class ArduinoUno extends Rs232 {
 	public final static int[] UNO_IN_PINS = new int[] { 12, 13, 14, 15, 16, 17, 18, 19 };
 
 	private byte rxBuffer[] = new byte[128];
+	final private String PIN_TEST = "04";
 
 	public boolean isProgramming = false;
+
+	private boolean configured = false;
 
 	public ArduinoUno() {
 		super();
@@ -88,6 +91,34 @@ public class ArduinoUno extends Rs232 {
 
 	protected boolean isArduinoMega() {
 		return this instanceof ArduinoMega;
+	}
+
+	@Override
+	public boolean start() {
+		boolean started = super.start();
+		if (started) {
+
+			// port opened, check sketch
+			if (!this.isSketchUploaded()) {
+				this.stop();
+				this.uploadSketch();
+				while (isProgramming) {
+					try {
+						Thread.sleep(10);
+					} catch (InterruptedException e) {
+						logger.error("{}", e);
+					}
+				}
+				super.start();
+				started = this.isSketchUploaded();
+			}
+			if (started) {
+				this.reset();
+			} else {
+				this.stop();
+			}
+		}
+		return started;
 	}
 
 	@Override
@@ -253,6 +284,32 @@ public class ArduinoUno extends Rs232 {
 		}
 	}
 
+	private boolean isSketchUploaded() {
+		this.eventLogger.set("Check arduino board is configured");
+		waitget.put(PIN_TEST, -1);
+		this.sendToArduino("g," + PIN_TEST);
+		try {
+			Thread.sleep(100);
+		} catch (InterruptedException e) {
+			logger.error("{}", e);
+		}
+		long endwait = DateTimeHelper.getSystemTime() + 5000;
+		while (DateTimeHelper.getSystemTime() < endwait) {
+			synchronized (this.waitget) {
+				if (this.waitget.get(PIN_TEST) != -1) {
+					this.eventLogger.set(null);
+					this.eventLogger.set("Sketch correct");
+					System.out.println("isSketchUploaded ok");
+					return true;
+				}
+			}
+		}
+
+		this.eventLogger.set("Wrong sketch.");
+		System.out.println("isSketchUploaded KO");
+		return false;
+	}
+
 	/**
 	 * upload arduino sketch
 	 */
@@ -275,7 +332,6 @@ public class ArduinoUno extends Rs232 {
 			public void run() {
 				isProgramming = true;
 				try {
-					this.stop();
 
 					String toolsFolder = SystemUtils.getToolsFolder();
 
@@ -294,20 +350,17 @@ public class ArduinoUno extends Rs232 {
 						command = AVRDudePath + " -C" + confPath + " -V -D -p ATmega328p -c arduino -P " + port
 								+ " -b 115200 -D -U flash:w:" + hexPath + ":i";
 					}
-					eventLogger.set(null);
-					eventLogger.set("HEX write command: " + command);
+					System.out.println(command);
+					eventLogger.set("Sketch installation in progress...");
 					Runtime rt = Runtime.getRuntime();
 					Process proc;
 					proc = rt.exec(command, null, new File(workingDir));
 					int exitVal = proc.waitFor();
 					logger.debug("Process exitValue: {}", exitVal);
-					eventLogger.set(null);
-					eventLogger.set("HEX write result: " + (exitVal == 0 ? "OK" : "ERROR " + String.valueOf(exitVal)));
-					this.start();
+					eventLogger.set("Upload result: " + (exitVal == 0 ? "OK" : "ERROR " + String.valueOf(exitVal)));
 					isProgramming = false;
 
 				} catch (Exception ex) {
-					eventLogger.set(null);
 					eventLogger.set("HEX write error: " + ex.getMessage());
 					logger.error("{}", ex);
 				}

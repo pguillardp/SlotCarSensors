@@ -95,4 +95,6 @@ public interface SensorInterface {
 	// true if this sensor uses a serial interface (even with usb/serial adapter)
 	boolean isSerial();
 
+	// optional: returns a sensor configuration help text
+	public String getConfigurationHelp();
 }
