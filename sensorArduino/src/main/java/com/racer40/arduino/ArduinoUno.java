@@ -95,10 +95,18 @@ public class ArduinoUno extends Rs232 {
 
 	@Override
 	public boolean start() {
-		boolean started = super.start();
-		if (started) {
+		this.stop();
+		this.comPort = SerialPort.getCommPort(this.port.toUpperCase());
+		if (this.comPort != null) {
+			if (this.comPort.isOpen()) {
+				this.comPort.closePort();
+			}
+			comPort.setComPortParameters(this.bauds, this.databit, this.stopbit, this.parity);
+			this.comPort.removeDataListener();
 
-			// port opened, check sketch
+			rxPos = 0;
+
+			// check sketch
 			if (!this.isSketchUploaded()) {
 				this.stop();
 				this.uploadSketch();
@@ -109,21 +117,26 @@ public class ArduinoUno extends Rs232 {
 						logger.error("{}", e);
 					}
 				}
-				super.start();
-				started = this.isSketchUploaded();
-			}
-			if (started) {
-				this.reset();
-			} else {
-				this.stop();
+
+				if (!this.isSketchUploaded()) {
+					this.stop();
+					return false;
+				}
 			}
 		}
-		return started;
+
+		// sketch uploaded => stop/start
+		boolean start = super.start();
+		return start;
 	}
 
 	@Override
 	protected void handleSerialEvent(SerialPortEvent event) {
 		byte[] data = event.getReceivedData();
+
+		for (int i = 0; i < data.length; i++) {
+			System.out.println(String.format("%02x", data[i]));
+		}
 
 		for (int i = 0; i < data.length; ++i) {
 			rxBuffer[rxPos] = data[i];
@@ -286,28 +299,40 @@ public class ArduinoUno extends Rs232 {
 
 	private boolean isSketchUploaded() {
 		this.eventLogger.set("Check arduino board is configured");
-		waitget.put(PIN_TEST, -1);
-		this.sendToArduino("g," + PIN_TEST);
-		try {
-			Thread.sleep(100);
-		} catch (InterruptedException e) {
-			logger.error("{}", e);
+
+		if (this.comPort.isOpen()) {
+			this.comPort.closePort();
 		}
-		long endwait = DateTimeHelper.getSystemTime() + 5000;
-		while (DateTimeHelper.getSystemTime() < endwait) {
-			synchronized (this.waitget) {
-				if (this.waitget.get(PIN_TEST) != -1) {
-					this.eventLogger.set(null);
-					this.eventLogger.set("Sketch correct");
-					System.out.println("isSketchUploaded ok");
-					return true;
-				}
-			}
+		if (!comPort.openPort()) {
+			return false;
 		}
 
-		this.eventLogger.set("Wrong sketch.");
-		System.out.println("isSketchUploaded KO");
-		return false;
+		// force synchronous reading
+		boolean uploaded = false;
+		comPort.removeDataListener();
+		comPort.setComPortTimeouts(SerialPort.TIMEOUT_READ_BLOCKING, 1000, 0);
+		try {
+			for (int tries = 0; (tries < 4) && (!uploaded); tries++) {
+				byte[] readBuffer = new byte[32];
+				int numRead = comPort.readBytes(readBuffer, 32);
+				String s = new String(readBuffer);
+				System.out.println("Read " + numRead + " bytes.");
+				System.out.println(s);
+				uploaded = s.contains("Start");
+			}
+		} catch (Exception e) {
+			logger.error("{}", e);
+		} finally {
+
+		}
+
+		this.comPort.closePort();
+		if (uploaded) {
+			this.eventLogger.set("Right sketch.");
+		} else {
+			this.eventLogger.set("Wrong sketch.");
+		}
+		return uploaded;
 	}
 
 	/**

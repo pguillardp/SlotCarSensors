@@ -29,12 +29,26 @@ public abstract class Rs232 extends SensorImpl {
 
 	protected int rxPos;
 
+	protected SerialPortDataListener dataListener;
+
 	protected static final int HEX_COLUMNS = 16;
 
 	public Rs232() {
 		super();
 		port = "COM1";
 		this.serial = true;
+		this.dataListener = new SerialPortDataListener() {
+			@Override
+			public int getListeningEvents() {
+				return SerialPort.LISTENING_EVENT_DATA_RECEIVED;
+			}
+
+			@Override
+			public void serialEvent(SerialPortEvent event) {
+				handleSerialEvent(event);
+			}
+		};
+
 	}
 
 	protected List<String> getSerialPortList() {
@@ -71,20 +85,9 @@ public abstract class Rs232 extends SensorImpl {
 			comPort.setComPortParameters(this.bauds, this.databit, this.stopbit, this.parity);
 			this.comPort.removeDataListener();
 
-			this.comPort.addDataListener(new SerialPortDataListener() {
-				@Override
-				public int getListeningEvents() {
-					return SerialPort.LISTENING_EVENT_DATA_RECEIVED;
-				}
-
-				@Override
-				public void serialEvent(SerialPortEvent event) {
-					handleSerialEvent(event);
-				}
-			});
-
 			rxPos = 0;
 			if (comPort.openPort()) {
+				this.comPort.addDataListener(this.dataListener);
 				return true;
 			}
 		}

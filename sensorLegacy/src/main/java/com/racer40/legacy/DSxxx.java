@@ -98,7 +98,6 @@ public abstract class DSxxx extends Rs232 {
 	 * @param offset
 	 */
 	private void parseFrame(int offset) {
-		StringBuilder information = new StringBuilder();
 
 		this.framefound = true;
 
@@ -118,8 +117,6 @@ public abstract class DSxxx extends Rs232 {
 
 		// detection pin
 		SensorPinImpl pin = null;
-		boolean detection = false;
-		boolean notify = true;
 
 		// allow structure to forward this event to the sensor
 		// assumes it will be released by its parent ;)
@@ -143,34 +140,26 @@ public abstract class DSxxx extends Rs232 {
 			break;
 		case 0x1B:
 			this.eventLogger.set("Timing data ");
-			information.append(" - Timing data");
 			break;
 		case 0x1C:
 			this.eventLogger.set("Final record data ");
-			information.append(" - Final record data");
 			break;
 		case 0x3A:
 			this.eventLogger.set("Programmed by time ");
-			information.append(" - Programmed by time");
 			break;
 		case 0x3B:
 			this.eventLogger.set("Programmed by laps (total) ");
-			information.append(" - Programmed by laps (total)");
 			break;
 		case 0x3C:
 			this.eventLogger.set("Programmed by laps (individual) ");
-			information.append(" - Programmed by laps (indi))");
 			break;
 		case 0x3D:
 			this.eventLogger.set("Programmed by F1 ");
-			information.append(" - Programmed by F1");
 			break;
 		case 0x3F:
-			information.append(" - Press start race button");
 			this.eventLogger.set("Press start race button");
 			break;
 		default:
-			information.append(" - Unknown data");
 			this.eventLogger.set(String.format("Unknown data %02x ", this.frame[7]));
 			break;
 		}
@@ -180,47 +169,33 @@ public abstract class DSxxx extends Rs232 {
 			switch (this.frame[8]) {
 			case (byte) 0xA1:
 				this.eventLogger.set("Start of race, phase 1 "); // not
-				// managed
-				// by DS
-				information.append(" - Start#1");
 				break;
 			case (byte) 0xA2:
-				this.eventLogger.set("Start of race, phase 2 "); // not
-				// managed
-				// by DS
-				information.append(" - Start#2");
+				this.eventLogger.set("Start of race, phase 2 ");
 				break;
 			case (byte) 0xA3:
-				this.eventLogger.set("Start of race, phase 3 "); // not
-				// managed
-				// by DS
-				information.append(" - Start#3");
+				this.eventLogger.set("Start of race, phase 3 ");
 				break;
 			case (byte) 0xA4:
-				this.eventLogger.set("End of race "); // not managed by DS
-				information.append(" - End of race");
+				this.eventLogger.set("End of race ");
 				break;
 
 			case (byte) 0xA5:
 				this.eventLogger.set("Start of pause ");
-				information.append(" - Pause");
 				pin = this.getPin("pause.in.0");
 				break;
 
 			case (byte) 0xA6:
 				this.eventLogger.set("End of pause ");
-				information.append(" - End pause");
 				pin = this.getPin("resume.in.0");
 				break;
 
 			case (byte) 0xA7:
 				this.eventLogger.set("Abort race ");
-				information.append(" - Abort");
 				pin = this.getPin("abort.in.0");
 				break;
 
 			default:
-				information.append(" - Unknown");
 				this.eventLogger.set(String.format("Unknown function %02x ", this.frame[8]));
 				break;
 			}
@@ -245,14 +220,12 @@ public abstract class DSxxx extends Rs232 {
 				 * Documentation say this should be "1st position. Actual use looks like this is
 				 * really fast lap.
 				 */
-				/* this.eventLogger.set("1st position "); */
 				this.eventLogger.set("Fast lap ");
 				break;
 			case (byte) 0xA9:
 				this.eventLogger.set("Fast lap ");
 				break;
 			default:
-				/* this.eventLogger.set("Identifier %02x ", this.frame[9]); */
 				break;
 			}
 
@@ -289,7 +262,6 @@ public abstract class DSxxx extends Rs232 {
 					this.eventLogger.set(String.format("Unknown lane number %02x\n", this.frame[10]));
 					break;
 				}
-				int bridge = lane;
 				if (lane > 0) {
 					int pinlane = lane;
 
@@ -302,11 +274,7 @@ public abstract class DSxxx extends Rs232 {
 
 					pin = this.getPin(pinlane + "");
 					pin.setDetectionID(lane);
-					detection = true;
 				}
-
-				// display information
-				information.append(String.format(" - Bridge  lane %d - DS lane %d", bridge, lane));
 			}
 		}
 
@@ -314,7 +282,6 @@ public abstract class DSxxx extends Rs232 {
 		int nLap = (this.frame[11] >> 4) * 1000 + (this.frame[11] & 0xf) * 100 + (this.frame[12] >> 4) * 10
 				+ (this.frame[12] & 0xf);
 		this.eventLogger.set("Laps " + nLap);
-		information.append(String.format(" - lap %d", nLap));
 
 		/* Display hours, minutes, seconds. */
 		this.eventLogger.set(String.format("HH:MM:SS %1d%1d:%1d%1d:%1d%1d.", this.frame[13] >> 4, this.frame[13] & 0xf,
@@ -333,29 +300,27 @@ public abstract class DSxxx extends Rs232 {
 			}
 		}
 
-		information.append(String.format(" - %02d:%02d:%02d.%03d", nHour, nMinute, nSecond, lMilli));
-
 		// Display fractions of a second
 		// nb : the DSxxx event timer and ur3 timer are not
 		// synchronised => do it when needed
 		this.eventLogger.set(String.format("%1d%1d%1d%1d.", this.frame[16] >> 4, this.frame[16] & 0xf,
 				this.frame[17] >> 4, this.frame[17] & 0xf));
-		pin.setTimeEvent(((long) nHour * 3600 + (long) nMinute * 60 + nSecond) * 1000 + lMilli, true);
-
+		if (pin != null) {
+			pin.setTimeEvent(((long) nHour * 3600 + (long) nMinute * 60 + nSecond) * 1000 + lMilli, true);
+		}
 		// Test checksum.
 		for (i = 1, checksum = 0; i < 18; i++) {
 			checksum += this.frame[i];
 		}
 		checksum += this.frame[19];
 		if ((checksum & 0xff) != this.frame[18]) {
-			this.eventLogger.set(String.format("Warning: Checksum failure.  Was %02x not %02x.\n", (checksum & 0xff),
+			this.eventLogger.set(String.format("Warning: Checksum failure. Was %02x not %02x.\n", (checksum & 0xff),
 					this.frame[18]));
 		}
 
 		// new data parsed => forward event to sensor if parsing is
 		// correct
-		if (notify) {
-			this.eventLogger.set(information.toString());
+		if (pin != null) {
 			this.notifyPinChanged(pin);
 		}
 	}

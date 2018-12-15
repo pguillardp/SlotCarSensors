@@ -289,13 +289,15 @@ public class TesterController implements Initializable {
 								break;
 							}
 						}
-						for (int i = 0; i < this.cmbPort.getItems().size(); i++) {
-							if (this.cmbPort.getItems().get(i).equalsIgnoreCase(newValue.getPort())) {
-								this.cmbPort.getSelectionModel().select(i);
-								break;
+						Platform.runLater(() -> {
+							for (int i = 0; i < this.cmbPort.getItems().size(); i++) {
+								if (this.cmbPort.getItems().get(i).equalsIgnoreCase(newValue.getPort())) {
+									this.cmbPort.getSelectionModel().select(i);
+									break;
+								}
 							}
-						}
-						editSetup.setText(newValue.getSetup());
+							editSetup.setText(newValue.getSetup());
+						});
 					}
 				});
 	}
@@ -389,14 +391,7 @@ public class TesterController implements Initializable {
 				this.currentSensor().getEventLogger().addListener(logListener);
 				this.currentSensor().pinChangeProperty().addListener(pinChangeListener);
 
-				this.editSetup.setText(this.currentSensor().getSetup());
-				this.cmbPort.getSelectionModel().clearSelection();
-				for (String s : this.cmbPort.getItems()) {
-					if (s.equalsIgnoreCase(this.currentSensor().getPort())) {
-						this.cmbPort.getSelectionModel().select(s);
-						break;
-					}
-				}
+				updatePortSetupGui();
 				this.sensorName.setText(this.currentSensor().getName());
 
 			} catch (Exception e) {
@@ -405,6 +400,17 @@ public class TesterController implements Initializable {
 
 			}
 		});
+	}
+
+	private void updatePortSetupGui() {
+		this.editSetup.setText(this.currentSensor().getSetup());
+		this.cmbPort.getSelectionModel().clearSelection();
+		for (String s : this.cmbPort.getItems()) {
+			if (s.equalsIgnoreCase(this.currentSensor().getPort())) {
+				this.cmbPort.getSelectionModel().select(s);
+				break;
+			}
+		}
 	}
 
 	/**

@@ -34,4 +34,10 @@ public class SensorConstants {
 	public static final String IN = "in";
 	public static final String OUT = "out";
 
+	// untyped pin identifier prefixes
+		public static final String PIN_IN = "digital.in.";
+		public static final String PIN_OUT = "digital.out.";
+
+		// typed pin prefixes
+		public static final String PIN_CAR = "car.in.";
 }
