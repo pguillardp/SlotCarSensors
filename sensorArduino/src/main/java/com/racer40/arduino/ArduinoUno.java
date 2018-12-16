@@ -38,6 +38,8 @@ import com.racer40.sensor.SystemUtils;
  */
 // http://stackoverflow.com/questions/4436733/how-to-write-java-code-that-return-a-line-of-string-into-a-string-variable-from
 public class ArduinoUno extends Rs232 {
+	private static final Logger logger = LoggerFactory.getLogger(ArduinoUno.class);
+
 	private static final char GET_DATE = 'D';
 
 	private static final char GET_PIN_VALUE = 'G';
@@ -52,19 +54,16 @@ public class ArduinoUno extends Rs232 {
 
 	private static final char PIN_CHANGED = 'C';
 
-	static final Logger logger = LoggerFactory.getLogger(ArduinoUno.class);
-
 	public static final String UNO = "Uno";
 
 	protected Map<String, Integer> waitget = new HashMap<>();
 
-	protected final static int[] UNO_OUT_PINS = new int[] { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 };
-	public final static int[] UNO_IN_PINS = new int[] { 12, 13, 14, 15, 16, 17, 18, 19 };
+	protected static final int[] UNO_OUT_PINS = new int[] { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 };
+	protected static final int[] UNO_IN_PINS = new int[] { 12, 13, 14, 15, 16, 17, 18, 19 };
 
 	private byte rxBuffer[] = new byte[128];
-	final private String PIN_TEST = "04";
 
-	public boolean isProgramming = false;
+	private boolean isProgramming = false;
 
 	private boolean configured = false;
 
@@ -86,11 +85,16 @@ public class ArduinoUno extends Rs232 {
 	}
 
 	protected boolean isArduinoUno() {
-		return this instanceof ArduinoUno;
+		return this.type == SensorConstants.ARDUINO_UNO;
 	}
 
 	protected boolean isArduinoMega() {
-		return this instanceof ArduinoMega;
+		return this.type == SensorConstants.ARDUINO_MEGA;
+	}
+
+	@Override
+	public boolean isStarted() {
+		return super.isStarted() && configured;
 	}
 
 	@Override
@@ -98,17 +102,10 @@ public class ArduinoUno extends Rs232 {
 		this.stop();
 		this.comPort = SerialPort.getCommPort(this.port.toUpperCase());
 		if (this.comPort != null) {
-			if (this.comPort.isOpen()) {
-				this.comPort.closePort();
-			}
 			comPort.setComPortParameters(this.bauds, this.databit, this.stopbit, this.parity);
-			this.comPort.removeDataListener();
-
-			rxPos = 0;
 
 			// check sketch
 			if (!this.isSketchUploaded()) {
-				this.stop();
 				this.uploadSketch();
 				while (isProgramming) {
 					try {
@@ -126,17 +123,17 @@ public class ArduinoUno extends Rs232 {
 		}
 
 		// sketch uploaded => stop/start
-		boolean start = super.start();
-		return start;
+		this.configured = true;
+		return super.start();
 	}
 
 	@Override
 	protected void handleSerialEvent(SerialPortEvent event) {
-		byte[] data = event.getReceivedData();
-
-		for (int i = 0; i < data.length; i++) {
-			System.out.println(String.format("%02x", data[i]));
+		if (!this.isStarted()) {
+			return;
 		}
+
+		byte[] data = event.getReceivedData();
 
 		for (int i = 0; i < data.length; ++i) {
 			rxBuffer[rxPos] = data[i];
@@ -196,6 +193,9 @@ public class ArduinoUno extends Rs232 {
 			this.eventLogger.set("Empty command");
 			return;
 		}
+		if (!this.isStarted()) {
+			return;
+		}
 
 		int pin;
 		int value;
@@ -221,7 +221,7 @@ public class ArduinoUno extends Rs232 {
 				if ((isArduinoMega() && !contains(ArduinoMega.MEGA_OUT_PINS, pin)
 						|| isArduinoUno() && !contains(ArduinoUno.UNO_OUT_PINS, pin))) {
 					this.eventLogger.set(null);
-					this.eventLogger.set("Wrong output pin number: " + String.valueOf(pin));
+					this.eventLogger.set("Wrong output pin number: (s)et : " + String.valueOf(pin));
 					return;
 				}
 
@@ -260,9 +260,10 @@ public class ArduinoUno extends Rs232 {
 
 				if ((isArduinoMega() && !contains(ArduinoMega.MEGA_OUT_PINS, pin)
 						&& !contains(ArduinoMega.MEGA_IN_PINS, pin))
-						|| (isArduinoUno() && !contains(UNO_OUT_PINS, pin) && !contains(UNO_IN_PINS, pin))) {
+						|| (isArduinoUno() && !contains(ArduinoUno.UNO_OUT_PINS, pin)
+								&& !contains(ArduinoUno.UNO_IN_PINS, pin))) {
 					this.eventLogger.set(null);
-					this.eventLogger.set("Wrong output pin number: " + String.valueOf(pin));
+					this.eventLogger.set("Wrong output pin number: (g)et : " + String.valueOf(pin));
 					return;
 				}
 
@@ -297,6 +298,12 @@ public class ArduinoUno extends Rs232 {
 		}
 	}
 
+	/**
+	 * test the sketch is uploaded<br>
+	 * caution: this method stops the port and removethe data listener
+	 * 
+	 * @return
+	 */
 	private boolean isSketchUploaded() {
 		this.eventLogger.set("Check arduino board is configured");
 
@@ -310,9 +317,9 @@ public class ArduinoUno extends Rs232 {
 		// force synchronous reading
 		boolean uploaded = false;
 		comPort.removeDataListener();
-		comPort.setComPortTimeouts(SerialPort.TIMEOUT_READ_BLOCKING, 1000, 0);
+		comPort.setComPortTimeouts(SerialPort.TIMEOUT_READ_BLOCKING, 1500, 0);
 		try {
-			for (int tries = 0; (tries < 4) && (!uploaded); tries++) {
+			for (int tries = 0; (tries < 2) && (!uploaded); tries++) {
 				byte[] readBuffer = new byte[32];
 				int numRead = comPort.readBytes(readBuffer, 32);
 				String s = new String(readBuffer);
@@ -327,6 +334,7 @@ public class ArduinoUno extends Rs232 {
 		}
 
 		this.comPort.closePort();
+		this.configured = uploaded;
 		if (uploaded) {
 			this.eventLogger.set("Right sketch.");
 		} else {
@@ -382,7 +390,12 @@ public class ArduinoUno extends Rs232 {
 					proc = rt.exec(command, null, new File(workingDir));
 					int exitVal = proc.waitFor();
 					logger.debug("Process exitValue: {}", exitVal);
-					eventLogger.set("Upload result: " + (exitVal == 0 ? "OK" : "ERROR " + String.valueOf(exitVal)));
+					if (exitVal == 0) {
+						eventLogger.set("Upload result: OK - sketch uploaded");
+					} else {
+						eventLogger.set("Upload result: ERROR " + String.valueOf(exitVal));
+						eventLogger.set("Check the arduino is connected on the right port and check serial port setup");
+					}
 					isProgramming = false;
 
 				} catch (Exception ex) {
@@ -442,6 +455,10 @@ public class ArduinoUno extends Rs232 {
 
 	@Override
 	public boolean setOutputPinValue(String pinIdentifier, int value) {
+		if (!this.isStarted()) {
+			return false;
+		}
+
 		String[] s = pinIdentifier.split("\\.");
 		String pin = s[2].length() == 1 ? "0" + s[2] : s[2];
 		this.sendToArduino("s," + pin + ",0" + (value != 0 ? 1 : 0));
@@ -453,6 +470,10 @@ public class ArduinoUno extends Rs232 {
 
 	@Override
 	public int getPinValue(String pinIdentifier) {
+		if (!this.isStarted()) {
+			return -1;
+		}
+
 		String[] s = pinIdentifier.split("\\.");
 		String pin = s[2].length() == 1 ? "0" + s[2] : s[2];
 		long endwait = DateTimeHelper.getSystemTime() + 500;

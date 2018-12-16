@@ -1,7 +1,6 @@
 package com.racer40.sensor;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
@@ -135,7 +134,13 @@ public abstract class Rs232 extends SensorImpl {
 	}
 
 	protected boolean contains(int[] data, final int key) {
-		return Arrays.stream(data).anyMatch(i -> i == key);
+		// return Arrays.stream(data).anyMatch(i -> i == key);
+		for (int i : data) {
+			if (i == key) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	protected String bytesToHex(byte[] bytes) {
