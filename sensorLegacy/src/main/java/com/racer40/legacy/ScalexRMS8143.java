@@ -27,7 +27,7 @@ import com.racer40.sensor.SensorPinImpl;
 public class ScalexRMS8143 extends Rs232 {
 	protected static final int DISCOVERY_TIMEOUT = 20;
 
-	private static final int MAX_STARTPOS = 6;
+	private static final int MAX_DETECTED_CARS = 6;
 
 	private static final String BLUE_BUTTON = "BLUE_BUTTON";
 
@@ -40,7 +40,7 @@ public class ScalexRMS8143 extends Rs232 {
 
 		this.type = SensorConstants.SCALEX_8143;
 		this.name = "Scalextric RMS C8143";
-		this.managedCars = MAX_STARTPOS;
+		this.managedCars = MAX_DETECTED_CARS;
 		this.pinoutImage = "rms8143_pinout.png";
 		this.image = "rms8143.jpg";
 
@@ -65,7 +65,7 @@ public class ScalexRMS8143 extends Rs232 {
 		if (car >= 0) {
 			String message;
 			long time = DateTimeHelper.getSystemTime();
-			if (car < MAX_STARTPOS) {
+			if (car < MAX_DETECTED_CARS) {
 				pin = this.getPin("car.in." + car);
 				pin.setDetectionID(car);
 				pin.setTimeEvent(time, false);
@@ -87,9 +87,9 @@ public class ScalexRMS8143 extends Rs232 {
 	protected void ioPinList() {
 		pins.clear();
 
-		for (int i = 0; i <= MAX_STARTPOS; i++) {
+		for (int i = 0; i <= MAX_DETECTED_CARS; i++) {
 			SensorPinImpl p;
-			if (i < MAX_STARTPOS) {
+			if (i < MAX_DETECTED_CARS) {
 				p = new SensorPinImpl(this, "car.in." + (i + 1), "Car #" + (i + 1));
 				p.setBounds(124 + i * 26, 276, 20, 41);
 			} else {

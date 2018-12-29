@@ -16,7 +16,7 @@ import org.slf4j.LoggerFactory;
 public class SystemUtils {
 	private static final String JAVA_LIBRARY_PATH = "java.library.path";
 
-	private static final String PLUGINS = "plugins";
+	public static final String PLUGINS = "plugins";
 
 	static final Logger logger = LoggerFactory.getLogger(SystemUtils.class);
 

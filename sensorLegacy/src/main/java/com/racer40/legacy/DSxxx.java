@@ -21,7 +21,7 @@ public abstract class DSxxx extends Rs232 {
 	private static final byte END_BYTE = (byte) 0xEB;
 	private static final byte TOTAL_BYTES = 21;
 
-	private static final int MAX_STARTPOS = 8;
+	private static final int MAX_DETECTED_CARS_CARS = 8;
 
 	private byte dataWord[] = new byte[TOTAL_BYTES * 3];
 	private byte frame[] = new byte[TOTAL_BYTES];

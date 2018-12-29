@@ -28,7 +28,7 @@ public class Trackmate extends Rs232 {
 	private static final byte END_BYTE = (byte) 0xEB;
 	private static final byte TOTAL_BYTES = 21;
 
-	private static final int MAX_STARTPOS = 8;
+	private static final int MAX_DETECTED_CARS = 8;
 
 	private byte dataWord[] = new byte[TOTAL_BYTES], olddataWord[] = new byte[TOTAL_BYTES];
 	private int byteCount, i, checksum;
@@ -40,7 +40,7 @@ public class Trackmate extends Rs232 {
 	byte buffer[] = null;
 
 	// DSxxx/UR30 timer offset
-	private long timeOffset[] = new long[MAX_STARTPOS];
+	private long timeOffset[] = new long[MAX_DETECTED_CARS];
 
 	private int dsComOffset = 0; // used to manage several ds per computer.
 	// Offset added to lane number
@@ -74,14 +74,14 @@ public class Trackmate extends Rs232 {
 
 	@Override
 	public void reset() {
-		for (int i = 0; i < MAX_STARTPOS; i++) {
+		for (int i = 0; i < MAX_DETECTED_CARS; i++) {
 			this.timeOffset[i] = 0l;
 		}
 	}
 
 	@Override
 	public boolean start() {
-		for (int i = 0; i < MAX_STARTPOS; i++) {
+		for (int i = 0; i < MAX_DETECTED_CARS; i++) {
 			this.timeOffset[i] = 0l;
 		}
 		return super.start();
@@ -252,7 +252,7 @@ public class Trackmate extends Rs232 {
 				buffer = null;
 			}
 
-			if (uids >= 1 && uids <= MAX_STARTPOS) {
+			if (uids >= 1 && uids <= MAX_DETECTED_CARS) {
 				SensorPinImpl pin = this.getPin("car.in." + uids);
 				pin.setDetectionID(uids);
 				pin.setTimeEvent((long) (tempTime / 1000), true);
@@ -297,7 +297,7 @@ public class Trackmate extends Rs232 {
 	protected void ioPinList() {
 		pins.clear();
 
-		for (int i = 1; i <= MAX_STARTPOS; i++) {
+		for (int i = 1; i <= MAX_DETECTED_CARS; i++) {
 			SensorPinImpl p = new SensorPinImpl(this, "car.in." + i, "Car # " + i);
 			pins.add(p);
 
