@@ -44,6 +44,8 @@ public class SystemUtils {
 		}
 		copyResourceFolderToPlugins("tools/");
 
+		loadSystemLibs();
+
 		SystemUtils.isInitialized = true;
 	}
 
@@ -140,7 +142,8 @@ public class SystemUtils {
 		if (!isWindows()) {
 			return false;
 		}
-		String path = getAsoluteAppFolder();
+		String path = getAsoluteAppFolder() + SystemUtils.PLUGINS;
+
 		logger.debug("app path: {}", path);
 		if (isWindows64bits()) {
 			path += "\\x64";
@@ -152,13 +155,10 @@ public class SystemUtils {
 			Field fieldSysPath = ClassLoader.class.getDeclaredField("sys_paths");
 			fieldSysPath.setAccessible(true);
 			fieldSysPath.set(null, null);
-		} catch (IllegalArgumentException | IllegalAccessException e) {
-			logger.error("{}", e);
-		} catch (NoSuchFieldException e) {
-			logger.error("{}", e);
-		} catch (SecurityException e) {
+		} catch (IllegalArgumentException | IllegalAccessException | NoSuchFieldException | SecurityException e) {
 			logger.error("{}", e);
 		}
+
 		return true;
 	}
 
