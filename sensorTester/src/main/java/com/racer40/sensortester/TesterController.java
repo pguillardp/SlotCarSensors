@@ -122,6 +122,13 @@ public class TesterController implements Initializable {
 		sensorTypes.add(new ArduinoUno());
 		sensorTypes.add(new ArduinoMega());
 
+		try {
+			Thread.sleep(2000);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
 		sensorTypes.add(new Phidget1012());
 		sensorTypes.add(new Phidget1014());
 		sensorTypes.add(new Phidget1017());

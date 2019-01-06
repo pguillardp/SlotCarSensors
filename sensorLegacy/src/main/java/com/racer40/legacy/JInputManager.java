@@ -1,7 +1,5 @@
 package com.racer40.legacy;
 
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,10 +26,11 @@ import net.java.games.input.EventQueue;
  *
  */
 public class JInputManager {
+	private static final int POLL_MS = 100;
+
 	static final Logger logger = LoggerFactory.getLogger(JInputManager.class);
 
 	private Timer sensorTimer;
-	private int poll = 100;
 	private Map<String, Gamepad> sensorMap = new HashMap<>();
 
 	private JInputManager() {
@@ -89,30 +88,15 @@ public class JInputManager {
 		return ctrl.getName();
 	}
 
-	public void setPoll(int pollms) {
-		this.poll = pollms;
-		if (this.sensorTimer != null) {
-			this.sensorTimer.setDelay(pollms);
-		}
-	}
-
 	public void start(Gamepad sensor) {
 		if (sensorTimer == null) {
 			this.sensorMap.clear();
-			sensorTimer = new Timer(this.poll, sensorTask);
+			sensorTimer = new Timer(JInputManager.POLL_MS, (e) -> run());
 			sensorTimer.setRepeats(true);
 			sensorTimer.start();
 		}
 		this.sensorMap.put(sensor.getSetup(), sensor);
 	}
-
-	ActionListener sensorTask = new ActionListener() {
-
-		@Override
-		public void actionPerformed(ActionEvent e) {
-			run();
-		}
-	};
 
 	public void stop() {
 		if (sensorTimer != null) {
@@ -155,7 +139,7 @@ public class JInputManager {
 	}
 
 	public List<String> getKeyList(Gamepad sensor) {
-		List<String> keys = new ArrayList<String>();
+		List<String> keys = new ArrayList<>();
 
 		Controller[] ca = ControllerEnvironment.getDefaultEnvironment().getControllers();
 
@@ -173,9 +157,7 @@ public class JInputManager {
 						keys.add(key);
 						/* Get the components name */
 						logger.debug("Component " + j + ": " + components[j].getName());
-
 						logger.debug("    Identifier: " + components[j].getIdentifier().getName());
-						System.out.print(" Digital");
 					}
 				}
 
@@ -195,7 +177,7 @@ public class JInputManager {
 				Component[] components = ctrl.getComponents();
 				for (int j = 0; j < components.length; j++) {
 					if (!components[j].isAnalog() && components[j].getIdentifier().getName().equalsIgnoreCase(button)) {
-						return components[j].getPollData() > 0.0f ? true : false;
+						return components[j].getPollData() > 0.0f;
 					}
 				}
 				break;

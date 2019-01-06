@@ -1,11 +1,13 @@
+
 package com.racer40.sensor;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Field;
 import java.net.URL;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.commons.io.Charsets;
 import org.apache.commons.io.FileUtils;
@@ -14,20 +16,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class SystemUtils {
+	static final Logger logger = LoggerFactory.getLogger(SystemUtils.class);
+
 	private static final String JAVA_LIBRARY_PATH = "java.library.path";
 
 	public static final String PLUGINS = "plugins";
 
-	static final Logger logger = LoggerFactory.getLogger(SystemUtils.class);
-
-	// additional libraries and tools installed
-	protected static boolean isInitialized = false;
-
+	private static Set<String> copied = new HashSet<>();
+	private static Set<String> loaded = new HashSet<>();
 	private static String OS = System.getProperty("os.name").toLowerCase();
 
 	public static void initializeEnvironment() {
 		// check external libraries have been installed
-		if (SystemUtils.isInitialized || !isWindows()) {
+		if (!isWindows()) {
 			return;
 		}
 
@@ -45,10 +46,13 @@ public class SystemUtils {
 		copyResourceFolderToPlugins("tools/");
 
 		loadSystemLibs();
-
-		SystemUtils.isInitialized = true;
 	}
 
+	/**
+	 * copy resources into pluggin folder
+	 * 
+	 * @param resourceFolder
+	 */
 	private static void copyResourceFolderToPlugins(String resourceFolder) {
 		InputStream resourceAsStream = SystemUtils.class.getClassLoader().getResourceAsStream(resourceFolder);
 		if (resourceAsStream == null) {
@@ -67,22 +71,26 @@ public class SystemUtils {
 			}
 			for (String f : files) {
 				URL inputUrl = SystemUtils.class.getResource("/" + resourceFolder + "/" + f);
-				dst = new File(libraryPath + "//" + f);
-				FileUtils.copyURLToFile(inputUrl, dst);
-			}
+				String dstpath = libraryPath + "//" + f;
+				dstpath = dstpath.replace("\\", "//");
+				if (!copied.contains(dstpath)) {
+					dst = new File(dstpath);
+					FileUtils.copyURLToFile(inputUrl, dst);
+					copied.add(dstpath);
 
-			// update library path
-			// if (!System.getProperty(SystemUtils.JAVA_LIBRARY_PATH).contains(libraryPath))
-			// {
-			// String libpath = System.getProperty(SystemUtils.JAVA_LIBRARY_PATH) +
-			// File.pathSeparator + libraryPath;
-			// libpath = libpath.replace("/", "\\").replace("//", "\\");
-			// logger.debug("sys path: {}", libpath);
-			// System.setProperty(SystemUtils.JAVA_LIBRARY_PATH, libpath);
-			// Field fieldSysPath = ClassLoader.class.getDeclaredField("sys_paths");
-			// fieldSysPath.setAccessible(true);
-			// fieldSysPath.set(null, null);
-			// }
+					// load library
+					if (dstpath.toLowerCase().endsWith(".dll")
+							&& (dstpath.contains("x64") || dstpath.contains("x86"))) {
+						// try {
+						// System.load(dstpath);
+						// } catch (UnsatisfiedLinkError e) {
+						// logger.error("Native code library failed to load - {}", e);
+						// } finally {
+						// }
+					}
+
+				}
+			}
 
 		} catch (IOException | SecurityException | IllegalArgumentException e) {
 			logger.error("{}", e);
@@ -135,27 +143,33 @@ public class SystemUtils {
 		return path + "/";
 	}
 
-	/*
-	 * load system dependant libraries
+	/**
+	 * update application library path
 	 */
 	public static boolean loadSystemLibs() {
 		if (!isWindows()) {
 			return false;
 		}
-		String path = getAsoluteAppFolder() + SystemUtils.PLUGINS;
+		String libraryPath = getAsoluteAppFolder() + SystemUtils.PLUGINS;
 
-		logger.debug("app path: {}", path);
 		if (isWindows64bits()) {
-			path += "\\x64";
+			libraryPath += "\\x64";
 		} else {
-			path += "\\x86";
+			libraryPath += "\\x86";
 		}
+		libraryPath = libraryPath.replace("/", "\\");
 		try {
-			System.setProperty(SystemUtils.JAVA_LIBRARY_PATH, path);
-			Field fieldSysPath = ClassLoader.class.getDeclaredField("sys_paths");
-			fieldSysPath.setAccessible(true);
-			fieldSysPath.set(null, null);
-		} catch (IllegalArgumentException | IllegalAccessException | NoSuchFieldException | SecurityException e) {
+			String javapath = System.getProperty(SystemUtils.JAVA_LIBRARY_PATH);
+			if (!javapath.contains(libraryPath)) {
+				// System.setProperty(SystemUtils.JAVA_LIBRARY_PATH, javapath + ";" +
+				// libraryPath);
+			}
+			String gamepath = System.getProperty("net.java.games.input.librarypath", "");
+			if (!gamepath.contains(libraryPath)) {
+				// System.setProperty("net.java.games.input.librarypath", libraryPath);
+			}
+
+		} catch (IllegalArgumentException | SecurityException e) {
 			logger.error("{}", e);
 		}
 

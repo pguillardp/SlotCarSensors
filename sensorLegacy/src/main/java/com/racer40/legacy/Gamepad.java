@@ -26,10 +26,6 @@ public class Gamepad extends SensorImpl {
 		this.ioPinList();
 	}
 
-	public void setPoll(int pollms) {
-		JInputManager.getInstance().setPoll(pollms);
-	}
-
 	@Override
 	public boolean start() {
 		super.start();

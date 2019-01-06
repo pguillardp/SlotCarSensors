@@ -106,6 +106,7 @@ public abstract class SensorImpl implements SensorInterface {
 	public SensorImpl(String port, String setup) {
 		this.configure(port, setup);
 		this.addInternalListeners();
+		SystemUtils.initializeEnvironment();
 	}
 
 	public void configure(String port, String setup) {

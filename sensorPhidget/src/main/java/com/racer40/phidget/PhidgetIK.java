@@ -28,7 +28,7 @@ import javafx.event.EventTarget;
 public abstract class PhidgetIK extends SensorImpl implements EventTarget {
 	static final Logger logger = LoggerFactory.getLogger(PhidgetIK.class);
 
-	private static final int ATTACH_TIMEOUT_MS = 5000;
+	private static final int ATTACH_TIMEOUT_MS = 2000;
 
 	// phidget device channels
 	private DigitalInput[] dinput = null;
@@ -143,8 +143,11 @@ public abstract class PhidgetIK extends SensorImpl implements EventTarget {
 
 			this.started = true;
 
-		} catch (NumberFormatException | PhidgetException e) {
+		} catch (NumberFormatException e) {
 			logger.error("{}", e);
+			this.stop();
+		} catch (PhidgetException e) {
+			logger.error("{}", e.getDescription());
 			this.stop();
 		} finally {
 		}
@@ -165,11 +168,13 @@ public abstract class PhidgetIK extends SensorImpl implements EventTarget {
 				// close channels
 				for (int i = 0; i < this.doutput.length; i++) {
 					this.doutput[i].close();
+					this.doutput[i] = null;
 				}
 
 				for (int i = 0; i < this.dinput.length; i++) {
 					this.dinput[i].removeStateChangeListener(digitalInputStateChangeListener);
 					this.dinput[i].close();
+					this.dinput[i] = null;
 				}
 			} catch (PhidgetException e) {
 				logger.error("{}", e);
@@ -250,7 +255,7 @@ public abstract class PhidgetIK extends SensorImpl implements EventTarget {
 						String message = "Found); " + phidget.getDeviceName() + " Serial Number: "
 								+ phidget.getDeviceSerialNumber();
 						int k = phidget.getChannel();
-						System.out.println(k);
+						// System.out.println(k);
 						if (!foundSetup.contains(message)) {
 							logger.debug(message);
 							foundSetup.add(message);
