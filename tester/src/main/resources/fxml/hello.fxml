@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import java.lang.*?>
+<?import javafx.scene.layout.*?>
+
+
+<AnchorPane fx:id="main" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="689.0" prefWidth="1072.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1">
+   <children>
+      <Button layoutX="227.0" layoutY="638.0" mnemonicParsing="false" onAction="#onDiscover" text="Discover" />
+      <Button layoutX="691.0" layoutY="638.0" mnemonicParsing="false" onAction="#onClearLogs" text="Clear logs" />
+      <TextArea fx:id="logs" editable="false" layoutX="825.0" layoutY="31.0" prefHeight="607.0" prefWidth="233.0" />
+      <Label layoutX="825.0" layoutY="14.0" text="Logs:" />
+      <ListView fx:id="cmbSensorTypes" layoutX="14.0" layoutY="33.0" prefHeight="343.0" prefWidth="200.0" />
+      <Label layoutX="14.0" layoutY="14.0" text="Sensor types:" />
+      <Label layoutX="14.0" layoutY="384.0" text="Found sensors:" />
+      <ListView fx:id="cmbFoundSensors" layoutX="14.0" layoutY="401.0" prefHeight="268.0" prefWidth="200.0" />
+      <Button layoutX="296.0" layoutY="638.0" mnemonicParsing="false" onAction="#onClearFoundSensors" text="Clear found sensors" />
+      <Button layoutX="423.0" layoutY="638.0" mnemonicParsing="false" onAction="#onRefreshSensorTypes" text="Refresh sensor types" />
+   </children>
+</AnchorPane>

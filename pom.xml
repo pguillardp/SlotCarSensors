@@ -9,6 +9,14 @@
 	<version>4.0.0-SNAPSHOT</version>
 	<packaging>pom</packaging>
 
+	<modules>
+		<module>sensorcommon</module>
+		<module>phidget</module>
+		<module>legacy</module>
+		<module>arduino</module>
+		<module>tester</module>
+	</modules>
+	
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<maven.compiler.source>1.8</maven.compiler.source>
@@ -16,7 +24,6 @@
 		<maven.build.timestamp.format>yyyy-MM-dd HH:mm</maven.build.timestamp.format>
 		<developer>URTeam</developer>
 		<copyright>by URTeam</copyright>
-
 	</properties>
 
 	<!-- Profile configuration -->
@@ -46,14 +53,6 @@
 
 	</profiles>
 
-
-	<modules>
-		<module>sensorCommon</module>
-		<module>sensorPhidget</module>
-		<module>sensorLegacy</module>
-		<module>sensorArduino</module>
-		<module>sensorTester</module>
-	</modules>
 
 	<dependencies>
 		<!-- https://mvnrepository.com/artifact/log4j/log4j -->

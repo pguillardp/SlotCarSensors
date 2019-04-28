@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>com.racer40</groupId>
+		<artifactId>sensorMaster</artifactId>
+		<version>4.0.0-SNAPSHOT</version>
+	</parent>
+
+	<artifactId>legacy</artifactId>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>2.1</version>
+				<configuration>
+					<source>1.8</source>
+					<target>1.8</target>
+				</configuration>
+			</plugin>
+		</plugins>
+
+	</build>
+
+	<repositories>
+		<repository>
+			<id>jitpack.io</id>
+			<url>https://jitpack.io</url>
+		</repository>
+	</repositories>
+
+	<dependencies>
+
+		<dependency>
+			<groupId>com.racer40</groupId>
+			<version>4.0.0-SNAPSHOT</version>
+			<artifactId>sensor</artifactId>
+		</dependency>
+
+		<!-- https://mvnrepository.com/artifact/net.java.jinput/coreapi -->
+		<dependency>
+			<groupId>net.java.jinput</groupId>
+			<artifactId>coreapi</artifactId>
+			<version>2.0.9</version>
+		</dependency>
+
+
+		<!-- https://mvnrepository.com/artifact/net.java.jinput/jinput-platform -->
+		<dependency>
+			<groupId>net.java.jinput</groupId>
+			<artifactId>jinput-platform</artifactId>
+			<version>2.0.7</version>
+			<type>pom</type>
+		</dependency>
+
+		<!-- https://mvnrepository.com/artifact/net.java.jinput/windows-plugin -->
+		<dependency>
+			<groupId>net.java.jinput</groupId>
+			<artifactId>windows-plugin</artifactId>
+			<version>2.0.9</version>
+		</dependency>
+
+
+		<dependency>
+			<groupId>com.github.williamahartman</groupId>
+			<artifactId>jamepad</artifactId>
+			<version>1.3</version>
+		</dependency>
+
+
+		<dependency>
+			<groupId>com.github.strikerx3</groupId>
+			<artifactId>jxinput</artifactId>
+			<version>1.0.0</version>
+		</dependency>
+
+
+
+	</dependencies>
+</project>

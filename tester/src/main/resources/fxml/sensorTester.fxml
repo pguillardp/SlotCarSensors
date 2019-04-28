@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.*?>
+<?import javafx.scene.text.*?>
+<?import javafx.scene.image.*?>
+<?import javafx.scene.control.*?>
+<?import java.lang.*?>
+<?import javafx.scene.layout.*?>
+
+<AnchorPane fx:id="main" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="689.0" prefWidth="1215.0" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.racer40.sensortester.TesterController">
+   <children>
+      <ImageView fx:id="viewSensorPinout" fitHeight="450.0" fitWidth="568.0" layoutX="237.0" layoutY="170.0" smooth="false" />
+      <Button layoutX="762.0" layoutY="638.0" mnemonicParsing="false" onAction="#onClearLogs" text="Clear logs" />
+      <TextArea fx:id="logs" editable="false" layoutX="825.0" layoutY="31.0" prefHeight="595.0" prefWidth="369.0">
+         <opaqueInsets>
+            <Insets left="10.0" top="10.0" />
+         </opaqueInsets>
+         <font>
+            <Font size="11.0" />
+         </font></TextArea>
+      <Button layoutX="227.0" layoutY="638.0" mnemonicParsing="false" onAction="#onDiscover" text="Discover" />
+      <Label layoutX="825.0" layoutY="14.0" text="Logs:" />
+      <ListView fx:id="cmbSensorTypes" layoutX="14.0" layoutY="33.0" prefHeight="343.0" prefWidth="200.0" />
+      <Label layoutX="14.0" layoutY="14.0" text="Sensor types:" />
+      <Label layoutX="14.0" layoutY="384.0" text="Found sensors:" />
+      <ListView fx:id="cmbFoundSensors" layoutX="14.0" layoutY="401.0" prefHeight="231.0" prefWidth="200.0" />
+      <Button layoutX="296.0" layoutY="638.0" mnemonicParsing="false" onAction="#onClearFoundSensors" text="Clear found sensors" />
+      <Button layoutX="423.0" layoutY="638.0" mnemonicParsing="false" onAction="#onRefreshSensorTypes" text="Refresh sensor types" />
+      <ImageView fx:id="viewSensor" fitHeight="115.0" fitWidth="151.0" layoutX="227.0" layoutY="33.0" pickOnBounds="true" preserveRatio="true" />
+      <Label fx:id="sensorName" layoutX="389.0" layoutY="33.0" prefHeight="17.0" prefWidth="246.0" text="Sensor name">
+         <font>
+            <Font size="14.0" />
+         </font>
+      </Label>
+      <Label fx:id="sensorVersion" layoutX="391.0" layoutY="61.0" text="version" />
+      <Button layoutX="663.0" layoutY="638.0" mnemonicParsing="false" onAction="#onResetSensor" text="Reset" />
+      <Button fx:id="btnStartStop" layoutX="553.0" layoutY="638.0" mnemonicParsing="false" onAction="#onStartSensor" text="Start" />
+      <TextField fx:id="editSetup" layoutX="464.0" layoutY="114.0" prefHeight="25.0" prefWidth="114.0" />
+      <Label fx:id="sensorVersion1" layoutX="394.0" layoutY="86.0" text="Port:" />
+      <Label fx:id="sensorVersion11" layoutX="394.0" layoutY="116.0" text="Setup:" />
+      <ComboBox fx:id="cmbPort" layoutX="464.0" layoutY="82.0" onAction="#onPortChange" prefHeight="25.0" prefWidth="92.0" />
+      <ImageView fx:id="statusImage" fitHeight="36.0" fitWidth="39.0" layoutX="723.0" layoutY="25.0" pickOnBounds="true" preserveRatio="true" />
+      <Label layoutX="608.0" layoutY="33.0" prefHeight="20.0" prefWidth="106.0" text="Running status:">
+         <font>
+            <Font size="14.0" />
+         </font>
+      </Label>
+      <CheckBox fx:id="chkDebug" layoutX="392.0" layoutY="148.0" mnemonicParsing="false" onAction="#onDebug" selected="true" text="Debug mode" textAlignment="RIGHT" />
+   </children>
+</AnchorPane>
