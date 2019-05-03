@@ -83,7 +83,13 @@ public interface SensorInterface {
 	// the event logger
 	// call discover to find similar installed sensors, listen to
 	// getDiscoveredInterface() to get found sensors
-	public void discover(long timeout);
+	public void discover(long timeoutms);
+
+	public boolean isAutomaticDiscovery();
+
+	public boolean isDiscoveryRunning();
+
+	public void stopDiscovery();
 
 	public SimpleObjectProperty<SensorInterface> getDiscoveredInterface();
 

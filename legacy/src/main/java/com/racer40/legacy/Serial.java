@@ -109,7 +109,7 @@ public class Serial extends SensorImpl {
 	@Override
 	public boolean setOutputPinValue(String pinIdentifier, int value) {
 		final String[] fields = pinIdentifier.split("\\.");
-		this.serialRunnable.write("s," + fields[2] + "," + (value > 0 ? 1 : 0));
+		this.serialRunnable.write("s," + fields[2] + "," + (value > 0 ? 1 : 0) + "\n");
 		return value > 0;
 	}
 
@@ -145,16 +145,13 @@ public class Serial extends SensorImpl {
 
 	@Override
 	protected void ioPinList() {
-
 		this.pins.clear();
-
 		pins.add(new SensorPinImpl(this, "digital.in.1", "DCD"));
 		pins.add(new SensorPinImpl(this, "digital.out.4", "DTR"));
 		pins.add(new SensorPinImpl(this, "digital.in.6", "DSR"));
 		pins.add(new SensorPinImpl(this, "digital.out.7", "RTS"));
 		pins.add(new SensorPinImpl(this, "digital.in.8", "CTS"));
 		pins.add(new SensorPinImpl(this, "digital.in.9", "IN"));
-
 		for (int i = 0; i < pins.size(); i++) {
 			((SensorPinImpl) pins.get(i)).setLocationIngrid(i + 1, 10, i + 1, 12);
 		}
@@ -206,11 +203,13 @@ public class Serial extends SensorImpl {
 
 		public void write(String string) {
 			try {
-				in.write(string.getBytes(StandardCharsets.UTF_8));
-				in.flush();
-				if (Serial.this.isDebugMode()) {
-					Serial.this.eventLogger.set(null);
-					Serial.this.eventLogger.set(string);
+				if (in != null) {
+					in.write(string.getBytes(StandardCharsets.UTF_8));
+					in.flush();
+					if (Serial.this.isDebugMode()) {
+						Serial.this.eventLogger.set(null);
+						Serial.this.eventLogger.set(string.replace("\n", ""));
+					}
 				}
 			} catch (IOException e) {
 				logger.debug("{}", e);
@@ -222,19 +221,7 @@ public class Serial extends SensorImpl {
 		 */
 		private void stop() {
 			if (this.in != null) {
-				try {
-					in.write("bye\n".getBytes(StandardCharsets.UTF_8));
-				} catch (IOException e) {
-					logger.debug("{}", e);
-				}
-				// while (this.process.isAlive()) {
-				// try {
-				// Thread.currentThread().sleep(50);
-				// } catch (InterruptedException e) {
-				// e.printStackTrace();
-				// }
-				// }
-				this.process.destroy();
+				this.write("bye\n");
 			}
 		}
 
@@ -248,7 +235,8 @@ public class Serial extends SensorImpl {
 
 				String exepath = SystemUtils.getLibraryFolder() + "serialPiner.exe";
 				exepath = exepath.replaceAll("/", "");
-				ProcessBuilder builder = new ProcessBuilder(exepath, Serial.this.port);
+				ProcessBuilder builder = new ProcessBuilder();
+				builder.command(exepath, Serial.this.port);
 				builder.redirectErrorStream(true); // so we can ignore the error stream
 				this.process = builder.start();
 
@@ -270,16 +258,19 @@ public class Serial extends SensorImpl {
 						fromSerial = fromSerial.toLowerCase().replaceAll("\n", "");
 						logger.debug("{}", fromSerial);
 						String[] fields = fromSerial.split(",");
+						String pinIdentifier = "digital.in.0";
+						if (fields.length >= 2) {
+							pinIdentifier = "digital"
+									+ (("4".equals(fields[1]) || "7".equals(fields[1])) ? ".out." : ".in.") + fields[1];
+						}
 						if (fields.length == 4 && "c".equals(fields[0])) {
-							String pinIdentifier = "digital.in." + fields[1];
 							SensorPinImpl pin = getPin(pinIdentifier);
 							if (pin != null) {
 								pin.setPinValueForNotification(
 										"0".equals(fields[3]) ? SensorConstants.PIN_OFF : SensorConstants.PIN_ON,
 										Long.parseLong(fields[2]), false, true);
 							}
-						} else if (fields.length == 3 && "g".equals(fields[0])) {
-							String pinIdentifier = "digital.in." + fields[1];
+						} else if (fields.length == 4 && "p".equals(fields[0])) {
 							SensorPinImpl pin = getPin(pinIdentifier);
 							if (pin != null) {
 								synchronized (waitget) {
@@ -302,7 +293,9 @@ public class Serial extends SensorImpl {
 					Thread.sleep(50);
 				}
 
-				if (!this.fxThread.isAlive() && this.process.isAlive()) {
+				this.stop();
+				if (!this.fxThread.isAlive()) {
+					this.stop();
 					this.process.destroy();
 				}
 

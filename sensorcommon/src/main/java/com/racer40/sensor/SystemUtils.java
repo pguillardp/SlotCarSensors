@@ -45,7 +45,7 @@ public class SystemUtils {
 		}
 		copyResourceFolderToPlugins("tools/");
 
-		loadSystemLibs();
+		// loadSystemLibs();
 	}
 
 	/**
@@ -78,16 +78,16 @@ public class SystemUtils {
 					FileUtils.copyURLToFile(inputUrl, dst);
 					copied.add(dstpath);
 
-					// load library
-					if (dstpath.toLowerCase().endsWith(".dll")
-							&& (dstpath.contains("x64") || dstpath.contains("x86"))) {
-						// try {
-						// System.load(dstpath);
-						// } catch (UnsatisfiedLinkError e) {
-						// logger.error("Native code library failed to load - {}", e);
-						// } finally {
-						// }
-					}
+					// // load library
+					// if (dstpath.toLowerCase().endsWith(".dll")
+					// && (dstpath.contains("x64") || dstpath.contains("x86"))) {
+					// // try {
+					// // System.load(dstpath);
+					// // } catch (UnsatisfiedLinkError e) {
+					// // logger.error("Native code library failed to load - {}", e);
+					// // } finally {
+					// // }
+					// }
 
 				}
 			}

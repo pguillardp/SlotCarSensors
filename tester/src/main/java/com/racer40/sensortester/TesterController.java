@@ -17,6 +17,7 @@ import com.racer40.legacy.DS045;
 import com.racer40.legacy.DS200;
 import com.racer40.legacy.DS300;
 import com.racer40.legacy.Gamepad;
+import com.racer40.legacy.Joystick;
 import com.racer40.legacy.Scalex7042;
 import com.racer40.legacy.ScalexRMS8143;
 import com.racer40.legacy.Serial;
@@ -108,8 +109,10 @@ public class TesterController implements Initializable {
 	void onRefreshSensorTypes(ActionEvent event) {
 		this.sensorTypes.clear();
 
-		sensorTypes.add(new Serial());
 		sensorTypes.add(new Gamepad());
+		sensorTypes.add(new Joystick());
+
+		sensorTypes.add(new Serial());
 		sensorTypes.add(new CarreraBB());
 		sensorTypes.add(new CarreraCU());
 		sensorTypes.add(new DS300());
@@ -122,17 +125,11 @@ public class TesterController implements Initializable {
 		sensorTypes.add(new ArduinoUno());
 		sensorTypes.add(new ArduinoMega());
 
-		try {
-			Thread.sleep(2000);
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-
 		sensorTypes.add(new Phidget1012());
 		sensorTypes.add(new Phidget1014());
 		sensorTypes.add(new Phidget1017());
 		sensorTypes.add(new Phidget1018());
+
 	}
 
 	@FXML
@@ -156,20 +153,27 @@ public class TesterController implements Initializable {
 	@FXML
 	void onDiscover(ActionEvent event) {
 		if (!this.cmbSensorTypes.getSelectionModel().isEmpty()) {
-			this.stopSensor();
-			onClearFoundSensors(null);
 			SensorInterface selectedItem = this.cmbSensorTypes.getSelectionModel().getSelectedItem();
 
-			// listener may have been already attached => remove it first
-			selectedItem.getEventLogger().removeListener(this.logListener);
-			selectedItem.getEventLogger().addListener(this.logListener);
+			if (selectedItem != null && selectedItem.isDiscoveryRunning()) {
+				selectedItem.stopDiscovery();
 
-			selectedItem.getDiscoveredInterface().removeListener(this.discoveryListener);
-			selectedItem.getDiscoveredInterface().addListener(this.discoveryListener);
-			if (selectedItem instanceof DS300 || selectedItem instanceof DS200 || selectedItem instanceof DS045) {
-				selectedItem.discover(20l);
 			} else {
-				selectedItem.discover(-1l);
+
+				this.stopSensor();
+				onClearFoundSensors(null);
+
+				// listener may have been already attached => remove it first
+				selectedItem.getEventLogger().removeListener(this.logListener);
+				selectedItem.getEventLogger().addListener(this.logListener);
+
+				selectedItem.getDiscoveredInterface().removeListener(this.discoveryListener);
+				selectedItem.getDiscoveredInterface().addListener(this.discoveryListener);
+				if (selectedItem instanceof DS300 || selectedItem instanceof DS200 || selectedItem instanceof DS045) {
+					selectedItem.discover(20000l);
+				} else {
+					selectedItem.discover(-1l);
+				}
 			}
 		}
 	}
@@ -320,7 +324,9 @@ public class TesterController implements Initializable {
 			SensorInterface currentSensor = this.currentSensor();
 			currentSensor.setSetup(this.editSetup.getText());
 			currentSensor.setDebugMode(this.chkDebug.isSelected());
+
 			this.currentSensor().start();
+
 			if (this.currentSensor().isStarted()) {
 				this.statusImage.setImage(this.led_on);
 				this.btnStartStop.setText("Stop");
@@ -330,6 +336,7 @@ public class TesterController implements Initializable {
 			for (SensorPinInterface pin : currentSensor.getPinList()) {
 				setPinButtonColor(pin);
 			}
+
 		}
 	}
 

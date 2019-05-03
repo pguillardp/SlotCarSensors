@@ -29,7 +29,7 @@
 		<dependency>
 			<groupId>com.racer40</groupId>
 			<version>4.0.0-SNAPSHOT</version>
-			<artifactId>sensor</artifactId>
+			<artifactId>sensorcommon</artifactId>
 		</dependency>
 
 		<dependency>

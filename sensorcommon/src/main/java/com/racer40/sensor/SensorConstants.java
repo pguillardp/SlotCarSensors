@@ -8,7 +8,8 @@ public class SensorConstants {
 	public static final int DS200 = 1040;
 	public static final int DS300 = 1041;
 	public static final int DS045 = 1042;
-	public static final int JOYSTICK_USB = 1055;
+	public static final int GAMEPAD_USB = 1055;
+	public static final int JOYSTICK_USB = 1056;
 	public static final int NINCO_PB_DIGITAL = 1060;
 	public static final int CARRERA_DIGITAL_BB = 1061;
 	public static final int SCALEX_DIG_7042 = 1064;
@@ -35,9 +36,9 @@ public class SensorConstants {
 	public static final String OUT = "out";
 
 	// untyped pin identifier prefixes
-		public static final String PIN_IN = "digital.in.";
-		public static final String PIN_OUT = "digital.out.";
+	public static final String PIN_IN = "digital.in.";
+	public static final String PIN_OUT = "digital.out.";
 
-		// typed pin prefixes
-		public static final String PIN_CAR = "car.in.";
+	// typed pin prefixes
+	public static final String PIN_CAR = "car.in.";
 }

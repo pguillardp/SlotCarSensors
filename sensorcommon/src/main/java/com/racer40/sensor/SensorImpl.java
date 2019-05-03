@@ -83,6 +83,7 @@ public abstract class SensorImpl implements SensorInterface {
 
 	// sensor discovery
 	protected SimpleObjectProperty<SensorInterface> discoveredInterface = new SimpleObjectProperty<>();
+	protected boolean automaticDiscovery = true;
 
 	// time management
 	private long timeOffset = SensorImpl.TIME_OFFSET_UNDEFINED;
@@ -357,6 +358,26 @@ public abstract class SensorImpl implements SensorInterface {
 	@Override
 	public String toString() {
 		return this.getName();
+	}
+
+	/*
+	 * sensor search utilities (non-Javadoc)
+	 * 
+	 * @see com.racer40.sensor.SensorInterface#isAutomaticDiscovery()
+	 */
+	@Override
+	public boolean isAutomaticDiscovery() {
+		return automaticDiscovery;
+	}
+
+	@Override
+	public boolean isDiscoveryRunning() {
+		return false;
+	}
+
+	@Override
+	public void stopDiscovery() {
+
 	}
 
 	/**

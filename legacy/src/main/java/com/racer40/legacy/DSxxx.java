@@ -42,6 +42,8 @@ public abstract class DSxxx extends Rs232 {
 	public DSxxx() {
 		super();
 
+		this.automaticDiscovery = false;
+
 		this.bauds = 4800;
 		databit = 8;
 		stopbit = SerialPort.ONE_STOP_BIT;
@@ -339,69 +341,93 @@ public abstract class DSxxx extends Rs232 {
 		return ds300;
 	}
 
-	private List<DS200> todiscover = new ArrayList<>();
-	private List<DS200> found = new ArrayList<>();
-	private Timer timer;
+	private List<DSxxx> todiscover = new ArrayList<>();
+	private List<DSxxx> found = new ArrayList<>();
+	private Timer timer = null;
 	protected boolean framefound = false;
 	private long prevsec = -1;
 	private long prevdate = -1;
+	private TimerTask repeatedTask = null;
+
+	@Override
+	public boolean isDiscoveryRunning() {
+		return this.timer != null;
+	}
+
+	@Override
+	public void stopDiscovery() {
+		if (timer != null) {
+			this.stopDiscovery("Search cancelled");
+		}
+	}
+
+	private void stopDiscovery(String log) {
+		if (timer != null) {
+			this.timer.cancel();
+			this.timer = null;
+			this.repeatedTask.cancel();
+			this.repeatedTask = null;
+			this.eventLogger.set(log);
+			this.todiscover.forEach(ds -> ds.stop());
+			this.todiscover.clear();
+		}
+	}
 
 	@Override
 	public void discover(long timeout) {
 
-		// start one sensor per available port
-		this.eventLogger.set(null);
-		this.eventLogger.set("Search for DSxxx during " + timeout + "ms. Trigger detection during this timeframe");
-		this.todiscover.clear();
-		this.found.clear();
+		if (this.timer == null) {
 
-		// one sensor per port
-		List<String> ports = this.getSerialPortList();
-		for (String port : ports) {
-			DS200 ds = new DS200();
-			this.todiscover.add(ds);
-			ds.setPort(port);
-			ds.setSetup("57600,8,0,1");
-			ds.framefound = false;
-			ds.start();
-		}
+			// start one sensor per available port
+			this.eventLogger.set(null);
+			this.eventLogger.set("Search for DSxxx during " + ((int) (timeout / 1000))
+					+ "s. Trigger detection during this timeframe");
+			this.todiscover.clear();
+			this.found.clear();
 
-		// timer to countdown search seconds
-		long startdate = DateTimeHelper.getSystemTime();
-		prevdate = startdate;
-		TimerTask repeatedTask = new TimerTask() {
-			@Override
-			public void run() {
-				long d = DateTimeHelper.getSystemTime();
-				long diff = d - prevdate;
-				prevdate = d;
-				if (diff > timeout) {
-					timer.cancel();
-				}
-				long sec = (timeout - diff) / 1000;
-				if (prevsec != sec) {
-					prevsec = sec;
-					eventLogger.set("Detecting ........ " + sec + "s");
-				}
-				for (DS200 ds : todiscover) {
-					if (ds.framefound && !found.contains(ds)) {
-						found.add(ds);
-						discoveredInterface.set(ds);
-					}
-
-					if ((timeout - diff) > (2 * timeout / 3) && !ds.getSetup().equals("4600,8,0,1")) {
-						ds.stop();
-						ds.setSetup("4800,8,0,1");
-						ds.start();
-					} else if ((timeout - diff) > (timeout / 3) && !ds.getSetup().equals("9600,8,0,1")) {
-						ds.stop();
-						ds.setSetup("9600,8,0,1");
-						ds.start();
-					}
-				}
+			// one sensor per port
+			List<String> ports = this.getSerialPortList();
+			for (String port : ports) {
+				DSxxx ds = (DSxxx) this.createSensor();
+				this.todiscover.add(ds);
+				ds.setPort(port);
+				ds.framefound = false;
+				ds.start();
 			}
-		};
-		timer = new Timer("Timer");
-		timer.scheduleAtFixedRate(repeatedTask, timeout, 100);
+
+			// timer to countdown search seconds
+			long startdate = DateTimeHelper.getSystemTime();
+			prevsec = -99;
+			this.repeatedTask = new TimerTask() {
+				@Override
+				public void run() {
+					long diff = DateTimeHelper.getSystemTime() - startdate;
+					if (diff > timeout) {
+						stopDiscovery("Timed out");
+						return;
+					}
+					long sec = (timeout - diff) / 1000;
+					if (sec < 0) {
+						sec = 0;
+					}
+					if (prevsec != sec) {
+						prevsec = sec;
+						eventLogger.set("Detecting ........ " + sec + "s");
+					}
+					for (DSxxx ds : todiscover) {
+						if (ds.framefound && !found.contains(ds)) {
+							found.add(ds);
+							discoveredInterface.set(ds);
+						}
+					}
+				}
+			};
+			timer = new Timer("Timer");
+			timer.scheduleAtFixedRate(repeatedTask, 0, 1000);
+
+		} else {
+
+			this.stopDiscovery();
+		}
 	}
 }

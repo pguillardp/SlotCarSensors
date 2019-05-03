@@ -12,16 +12,16 @@ import com.racer40.sensor.SensorPinImpl;
 import net.java.games.input.Event;
 
 // http://www.hytherion.com/beattidp/comput/pport.htm
-public class Gamepad extends SensorImpl {
-	final Logger logger = LoggerFactory.getLogger(Gamepad.class);
+public class Joystick extends SensorImpl {
+	final Logger logger = LoggerFactory.getLogger(Joystick.class);
 
-	public Gamepad() {
+	public Joystick() {
 		super();
-		this.type = SensorConstants.GAMEPAD_USB;
-		this.name = "USB gamepad";
+		this.type = SensorConstants.JOYSTICK_USB;
+		this.name = "USB joystick";
 		this.managedCars = -1;
 		this.pinoutImage = "gamepad_pinout.png";
-		this.image = "gamepad.jpg";
+		this.image = "joystick.jpg";
 
 		this.ioPinList();
 	}
@@ -29,17 +29,17 @@ public class Gamepad extends SensorImpl {
 	@Override
 	public boolean start() {
 		super.start();
-		JamePadManager.getInstance().start(this);
+		JInputManager.getInstance().start(this);
 		return true;
 	}
 
 	protected void closePort() {
-		JamePadManager.getInstance().stop(this);
+		JInputManager.getInstance().stop(this);
 	}
 
 	@Override
 	public boolean isStarted() {
-		return JamePadManager.getInstance().isRunning(this);
+		return JInputManager.getInstance().isRunning(this);
 	}
 
 	@Override
@@ -47,12 +47,11 @@ public class Gamepad extends SensorImpl {
 
 	}
 
-	/**
-	 * event received from JamePadManager
+	/*
+	 * event received from JInputManager
 	 */
 	protected void handleJInputEvent(Event event) {
-		String identifier = event.getComponent().getIdentifier().getName().toLowerCase().replace("button", "")
-				.replace(" ", "");
+		String identifier = event.getComponent().getIdentifier().getName();
 		SensorPinImpl pin = this.getPin("digital.in." + (Integer.parseInt(identifier) + 1));
 		if (pin != null) {
 			pin.setPinValueForNotification(event.getValue() > 0 ? SensorConstants.PIN_ON : SensorConstants.PIN_OFF,
@@ -62,7 +61,7 @@ public class Gamepad extends SensorImpl {
 
 	@Override
 	public void stop() {
-		JamePadManager.getInstance().stop(this);
+		JInputManager.getInstance().stop(this);
 	}
 
 	@Override
@@ -77,18 +76,18 @@ public class Gamepad extends SensorImpl {
 	@Override
 	public int getPinValue(String pinIdentifier) {
 		int index = Integer.parseInt(pinIdentifier.split("\\.")[2]) - 1;
-		return JamePadManager.getInstance().getButtonState(this, index + "") ? SensorConstants.PIN_ON
+		return JInputManager.getInstance().getButtonState(this, index + "") ? SensorConstants.PIN_ON
 				: SensorConstants.PIN_OFF;
 	}
 
 	@Override
 	public void discover(long timeout) {
-		JamePadManager.getInstance().discoverSetup(this.discoveredInterface, this);
+		JInputManager.getInstance().discoverSetup(this.discoveredInterface, this);
 	}
 
 	@Override
 	protected void ioPinList() {
-		List<String> querypins = JamePadManager.getInstance().getKeyList(this);
+		List<String> querypins = JInputManager.getInstance().getKeyList(this);
 		SensorPinImpl p;
 		if (!querypins.isEmpty()) {
 			this.pins.clear();

@@ -101,11 +101,15 @@ public abstract class PhidgetIK extends SensorImpl implements EventTarget {
 	};
 
 	/**
-	 * starts a phidget
+	 * starts a phidget => always in background task to let it system time
+	 * initialization
 	 */
 	@Override
 	public boolean start() {
 		super.start();
+
+		// JInputManager.stopJInputManagerPoll();
+
 		if (this.dinput != null) {
 			stop();
 		}
@@ -156,6 +160,18 @@ public abstract class PhidgetIK extends SensorImpl implements EventTarget {
 			this.eventLogger.set("Unable to attach phidget sn:" + no + "\nError: " + error + "\n"
 					+ "Check:\n-serial number\n-phidget setup with the phidget controller\n- phidget controller is closed. ");
 		}
+
+		// JInputManager.startJInputManagerPoll(Thread.currentThread());
+		// };
+		// Thread thread = new Thread(runnable);
+		// thread.start();
+		//
+		// // synchronous timed out start
+		// long timeout = DateTimeHelper.getSystemTime() + (long)
+		// (PhidgetIK.ATTACH_TIMEOUT_MS * 1.2);
+		// while (!started && DateTimeHelper.getSystemTime() < timeout)
+		// ;
+
 		return this.started;
 	}
 
