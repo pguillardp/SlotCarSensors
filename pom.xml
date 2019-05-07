@@ -24,6 +24,7 @@
 		<maven.build.timestamp.format>yyyy-MM-dd HH:mm</maven.build.timestamp.format>
 		<developer>URTeam</developer>
 		<copyright>by URTeam</copyright>
+		<javafx.version>12</javafx.version>
 	</properties>
 
 	<!-- Profile configuration -->
